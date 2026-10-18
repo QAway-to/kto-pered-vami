@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: kto-pered-vami
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AI_CALLS_PER_HOUR
+        value: "300"

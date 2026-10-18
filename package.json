@@ -1,0 +1,21 @@
+{
+  "name": "kto-pered-vami",
+  "version": "0.1.0",
+  "description": "Тренажёр для определения психотипов (DISC) и практики общения с ИИ-персонажами",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test --experimental-test-coverage \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "express": "^4.22.3"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
+  }
+}
