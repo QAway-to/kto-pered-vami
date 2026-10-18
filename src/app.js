@@ -5,6 +5,9 @@ import { LlmError } from './llm.js';
 import { PERSONAS, PERSONA_IDS, publicPersona } from './personas.js';
 import { validateMessages, isPersonaId, MAX_ASSISTANT_CHARS } from './validate.js';
 import { createRateLimiter } from './rateLimit.js';
+import {
+  validateLabRequest, nextSpeaker, labSystem, labMessages, verdictPrompt, parseVerdict, MAX_LINE_CHARS,
+} from './lab.js';
 import { ARCHETYPES, ARCHETYPE_IDS } from '../public/js/archetypes.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -76,10 +79,13 @@ function parseTranscript(personaId, messages) {
 }
 
 /**
- * @param {{llm: import('./llm.js').LlmProvider|null, rateLimit?: {windowMs: number, max: number}, aiCallsPerHour?: number}} deps
+ * @param {{llm: import('./llm.js').LlmProvider|null, rateLimit?: {windowMs: number, max: number}, labRateLimit?: {windowMs: number, max: number}, aiCallsPerHour?: number}} deps
+ * One lab experiment is 11 AI calls in about a minute, so the default per-IP limit leaves room for that.
  * @returns {import('express').Express}
  */
-export function createApp({ llm, rateLimit = { windowMs: 60_000, max: 20 }, aiCallsPerHour = 300 }) {
+export function createApp({
+  llm, rateLimit = { windowMs: 60_000, max: 40 }, labRateLimit = { windowMs: 600_000, max: 45 }, aiCallsPerHour = 300,
+}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1); // Render sits behind one proxy
@@ -167,6 +173,51 @@ ${formatTranscript(parsed.value, persona.name)}
         actual: personaId,
         feedback: feedback ?? 'Не удалось получить разбор. Попробуйте ещё раз.',
       }));
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Lab: one AI line per call, so the browser can show the conversation live.
+  // Its own per-IP cap (~4 experiments per 10 minutes) keeps one visitor from draining the shared hourly budget.
+  const labLimit = createRateLimiter({
+    ...labRateLimit,
+    message: 'Слишком много экспериментов подряд. Подождите несколько минут.',
+  });
+
+  api.post('/lab/turn', labLimit, aiBudget, async (req, res, next) => {
+    const parsed = validateLabRequest(req.body);
+    if (!parsed.ok) return res.status(400).json(fail(parsed.error));
+    const { a, b, scenario, transcript } = parsed.value;
+    const speaker = nextSpeaker(transcript);
+    const [self, other] = speaker === 'a' ? [a, b] : [b, a];
+    try {
+      const line = await llm.complete({
+        system: labSystem(self, other, scenario),
+        messages: labMessages(transcript, speaker),
+        mode: 'chat',
+        maxTokens: 600,
+      });
+      return res.json(ok({ speaker, text: (line ?? '…').slice(0, MAX_LINE_CHARS) }));
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  api.post('/lab/verdict', labLimit, aiBudget, async (req, res, next) => {
+    const parsed = validateLabRequest(req.body, { forVerdict: true });
+    if (!parsed.ok) return res.status(400).json(fail(parsed.error));
+    const { system, user } = verdictPrompt(parsed.value);
+    try {
+      const reply = await llm.complete({
+        system,
+        messages: [{ role: 'user', content: user }],
+        mode: 'analysis',
+        maxTokens: 8000,
+      });
+      const verdict = parseVerdict(reply);
+      if (!verdict) return res.status(502).json(fail('Не удалось получить вердикт. Попробуйте ещё раз.'));
+      return res.json(ok(verdict));
     } catch (err) {
       return next(err);
     }

@@ -1,80 +1,8 @@
-import { ARCHETYPES, ARCHETYPE_IDS, archetypeImage } from './archetypes.js';
+import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
 import { QUESTIONS, LIKERT, DIMENSIONS, DIM_KEYS, scoreDimensions, rankArchetypes } from './quiz.js';
 import { CASES } from './cases.js';
-
-/* ---------- helpers ---------- */
-
-/**
- * Tiny DOM builder. Text is always set via textContent (no innerHTML → no XSS).
- * @param {string} tag
- * @param {{class?: string, text?: string, vars?: Record<string,string>, on?: Record<string, EventListener>, attrs?: Record<string,string>}} [props]
- * @param {(Node|string|null|false|undefined)[]} [children]
- */
-function h(tag, props = {}, children = []) {
-  const el = document.createElement(tag);
-  if (props.class) el.className = props.class;
-  if (props.text != null) el.textContent = props.text;
-  for (const [k, v] of Object.entries(props.vars ?? {})) el.style.setProperty(k, v);
-  for (const [k, v] of Object.entries(props.attrs ?? {})) el.setAttribute(k, v);
-  for (const [k, v] of Object.entries(props.on ?? {})) el.addEventListener(k, v);
-  for (const c of children) if (c) el.append(c);
-  return el;
-}
-
-function mount(id, ...nodes) {
-  document.getElementById(id).replaceChildren(...nodes.filter(Boolean));
-}
-
-function shuffle(arr) {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
-const store = {
-  get(key, fallback) {
-    try {
-      const raw = localStorage.getItem(`kpv4:${key}`);
-      return raw == null ? fallback : JSON.parse(raw);
-    } catch {
-      return fallback;
-    }
-  },
-  set(key, value) {
-    try { localStorage.setItem(`kpv4:${key}`, JSON.stringify(value)); } catch { /* storage unavailable: non-critical */ }
-  },
-};
-
-async function api(path, body) {
-  const res = await fetch(`/api${path}`, {
-    method: body ? 'POST' : 'GET',
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let json;
-  try { json = await res.json(); } catch { throw new Error('Сервер вернул некорректный ответ'); }
-  if (!json.success) throw new Error(json.error || 'Ошибка запроса');
-  return json.data;
-}
-
-/** Archetype artwork: generated image when available, emoji on a tinted gradient otherwise. */
-function media(id, size = '') {
-  const a = ARCHETYPES[id];
-  const src = archetypeImage(id);
-  return h('div', { class: `media ${size}`, vars: { '--c': a.color } }, [
-    src
-      ? h('img', { attrs: { src, alt: a.name, loading: 'lazy' } })
-      : h('span', { class: 'media-emoji', text: a.emoji, attrs: { 'aria-hidden': 'true' } }),
-  ]);
-}
-
-function chip(id) {
-  const a = ARCHETYPES[id];
-  return `${a.emoji} ${a.name}`;
-}
+import { h, mount, shuffle, store, api, media, chip } from './ui.js';
+import { renderLab } from './lab-ui.js';
 
 /** Saved test result, or null if missing or made with archetypes that no longer exist. */
 function loadResult() {
@@ -93,7 +21,9 @@ if (tg && tg.initData !== undefined) {
 
 /* ---------- navigation ---------- */
 
-const renderers = { home: renderHome, type: renderType, test: renderTest, cases: renderCases, dialog: renderDialog };
+const renderers = {
+  home: renderHome, type: renderType, test: renderTest, cases: renderCases, dialog: renderDialog, lab: renderLab,
+};
 
 function go(tab, arg) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.tab === tab));
@@ -151,7 +81,7 @@ function renderType(id) {
         h('p', { class: 'lead', text: a.tagline }),
         h('div', { class: 'row' }, [
           h('button', { class: 'btn btn-primary', text: `Потренироваться с ним`, on: { click: () => go('dialog', id) } }),
-          h('button', { class: 'btn btn-ghost', text: 'Пройти тест', on: { click: () => go('test') } }),
+          h('button', { class: 'btn btn-ghost', text: 'Свести в лаборатории', on: { click: () => go('lab', id) } }),
         ]),
       ]),
     ]),
