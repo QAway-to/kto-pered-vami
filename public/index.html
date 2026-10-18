@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Кто перед вами</title>
-  <meta name="description" content="Тренажёр для определения психотипов и практики общения">
+  <meta name="description" content="12 архетипов — от тёмного эмпата до светлой триады. Тест, кейсы и тренажёр общения на основе исследований.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -18,58 +18,34 @@
       <span>Кто перед вами</span>
     </div>
     <nav class="tabs" role="tablist">
-      <button class="tab is-active" role="tab" data-tab="home">Главная</button>
+      <button class="tab is-active" role="tab" data-tab="home">Архетипы</button>
       <button class="tab" role="tab" data-tab="test">Мой тип</button>
-      <button class="tab" role="tab" data-tab="cases">Кейсы</button>
-      <button class="tab" role="tab" data-tab="dialog">Диалог</button>
+      <button class="tab" role="tab" data-tab="cases">Флаги</button>
+      <button class="tab" role="tab" data-tab="dialog">Тренажёр</button>
     </nav>
   </header>
 
   <main>
-    <!-- HOME -->
     <section class="view is-active" id="view-home">
-      <h1 class="display">Поймите, кто перед вами,<br>за пять реплик.</h1>
-      <p class="lead">Тренажёр общения по модели DISC. Узнайте свой стиль, научитесь распознавать чужой и потренируйтесь договариваться с ИИ-персонажами.</p>
+      <span class="eyebrow">Тренд + наука</span>
+      <h1 class="display">12 архетипов.<br>Кто перед вами?</h1>
+      <p class="lead">Тёмный эмпат, скрытый нарцисс, эмоциональные качели — за каждым популярным понятием стоит черта, изученная в рецензируемых исследованиях. Узнайте, как их распознать и как с ними общаться.</p>
       <div class="stats" id="stats"></div>
-      <div class="grid">
-        <button class="card card-link" data-go="test">
-          <span class="eyebrow">Шаг 1 · 2 минуты</span>
-          <h3>Мой тип</h3>
-          <p>12 вопросов — и вы узнаете свой стиль общения и слепые зоны.</p>
-        </button>
-        <button class="card card-link" data-go="cases">
-          <span class="eyebrow">Шаг 2 · каждый день</span>
-          <h3>Кейсы «Кто это?»</h3>
-          <p>Короткие ситуации из жизни. Угадайте тип по поведению.</p>
-        </button>
-        <button class="card card-link card-dark" data-go="dialog">
-          <span class="eyebrow">Шаг 3 · главная тренировка</span>
-          <h3>Диалог с персонажем</h3>
-          <p>Случайный собеседник со скрытым типом. Договоритесь — и получите разбор от ИИ-тренера.</p>
-        </button>
+      <div class="row hero-actions">
+        <button class="btn btn-primary" data-go="test">Узнать свой архетип</button>
+        <button class="btn btn-ghost" data-go="dialog">Тренажёр с персонажем</button>
       </div>
-      <h2 class="section-title">Четыре типа</h2>
-      <div class="types" id="types"></div>
+      <div class="archetype-grid" id="archetype-grid"></div>
     </section>
 
-    <!-- TEST -->
-    <section class="view" id="view-test">
-      <div id="test-body"></div>
-    </section>
-
-    <!-- CASES -->
-    <section class="view" id="view-cases">
-      <div id="cases-body"></div>
-    </section>
-
-    <!-- DIALOG -->
-    <section class="view" id="view-dialog">
-      <div id="dialog-body"></div>
-    </section>
+    <section class="view" id="view-type"><div id="type-body"></div></section>
+    <section class="view" id="view-test"><div id="test-body"></div></section>
+    <section class="view" id="view-cases"><div id="cases-body"></div></section>
+    <section class="view" id="view-dialog"><div id="dialog-body"></div></section>
   </main>
 
   <footer class="foot">
-    DISC — инструмент для самопознания и практики общения, а не диагноз. Узнавайте людей, чтобы лучше договариваться, а не чтобы манипулировать.
+    Это инструмент для самопознания и тренировки общения, а не диагностика. Архетипы описывают паттерны поведения; поставить диагноз может только специалист. Узнавайте людей, чтобы выстраивать границы и договариваться, а не чтобы навешивать ярлыки.
   </footer>
 
   <script type="module" src="/js/app.js"></script>

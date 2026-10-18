@@ -1,38 +1,69 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreAnswers, QUESTIONS, TYPE_KEYS } from '../public/js/disc.js';
+import { ARCHETYPES, ARCHETYPE_IDS, archetypeImage } from '../public/js/archetypes.js';
+import { QUESTIONS, DIM_KEYS, PROTOTYPES, scoreDimensions, rankArchetypes } from '../public/js/quiz.js';
 import { CASES } from '../public/js/cases.js';
 import { validateMessages, isPersonaId, MAX_MESSAGES, MAX_MESSAGE_CHARS } from '../src/validate.js';
-import { PERSONAS, publicPersona } from '../src/personas.js';
+import { PERSONAS, PERSONA_IDS, publicPersona } from '../src/personas.js';
 import { createRateLimiter } from '../src/rateLimit.js';
 
-test('scoreAnswers picks primary and secondary types', () => {
-  const r = scoreAnswers(['D', 'D', 'D', 'C', 'C', 'I']);
-  assert.equal(r.primary, 'D');
-  assert.equal(r.secondary, 'C');
-  assert.deepEqual(r.counts, { D: 3, I: 1, S: 0, C: 2 });
-  assert.equal(r.percents.D, 50);
+const idealAnswers = (id) => QUESTIONS.map((q) => (
+  PROTOTYPES[id].high.includes(q.dim) ? 5 : PROTOTYPES[id].low.includes(q.dim) ? 1 : 3));
+
+test('there are at least 10 archetypes, each fully described with sources', () => {
+  assert.ok(ARCHETYPE_IDS.length >= 10);
+  for (const id of ARCHETYPE_IDS) {
+    const a = ARCHETYPES[id];
+    for (const field of ['name', 'tagline', 'emoji', 'color', 'construct', 'science', 'howTo']) {
+      assert.ok(typeof a[field] === 'string' && a[field].length > 0, `${id}.${field}`);
+    }
+    assert.ok(a.signs.length >= 3 && a.flags.length >= 3 && a.refs.length >= 1, id);
+  }
 });
 
-test('scoreAnswers handles empty input and ties deterministically', () => {
-  assert.deepEqual(scoreAnswers([]).primary, null);
-  assert.equal(scoreAnswers(['S', 'I']).primary, 'I');
-  assert.equal(scoreAnswers(['S']).secondary, null);
+test('every archetype has a persona, a prototype and at least one case', () => {
+  assert.deepEqual([...PERSONA_IDS].sort(), [...ARCHETYPE_IDS].sort());
+  assert.deepEqual(Object.keys(PROTOTYPES).sort(), [...ARCHETYPE_IDS].sort());
+  for (const c of CASES) assert.ok(ARCHETYPE_IDS.includes(c.answer), c.answer);
+  for (const id of ARCHETYPE_IDS) assert.ok(CASES.some((c) => c.answer === id), `no case for ${id}`);
 });
 
-test('scoreAnswers rejects bad input', () => {
-  assert.throws(() => scoreAnswers('D'), TypeError);
-  assert.throws(() => scoreAnswers(['X']), RangeError);
+test('quiz covers every dimension with two items and prototypes use known dimensions', () => {
+  assert.equal(QUESTIONS.length, DIM_KEYS.length * 2);
+  for (const k of DIM_KEYS) assert.equal(QUESTIONS.filter((q) => q.dim === k).length, 2);
+  for (const { high, low } of Object.values(PROTOTYPES)) {
+    for (const d of [...high, ...low]) assert.ok(DIM_KEYS.includes(d), d);
+  }
 });
 
-test('content is complete: every question covers all four types, cases have valid answers', () => {
-  for (const q of QUESTIONS) assert.deepEqual(Object.keys(q.a).sort(), [...TYPE_KEYS].sort());
-  for (const c of CASES) assert.ok(TYPE_KEYS.includes(c.answer));
-  assert.deepEqual(Object.keys(PERSONAS).sort(), [...TYPE_KEYS].sort());
+test('scoreDimensions normalises Likert answers to 0..1', () => {
+  const dims = scoreDimensions(QUESTIONS.map(() => 5));
+  for (const k of DIM_KEYS) assert.equal(dims[k], 1);
+  assert.equal(scoreDimensions(QUESTIONS.map(() => 1)).MACH, 0);
+  assert.equal(scoreDimensions(QUESTIONS.map(() => 3)).LIGHT, 0.5);
+});
+
+test('scoreDimensions rejects bad input', () => {
+  assert.throws(() => scoreDimensions([1, 2]), RangeError);
+  assert.throws(() => scoreDimensions('x'), RangeError);
+  assert.throws(() => scoreDimensions(QUESTIONS.map(() => 6)), RangeError);
+});
+
+test('each archetype prototype ranks itself first, strictly', () => {
+  for (const id of ARCHETYPE_IDS) {
+    const [first, second] = rankArchetypes(scoreDimensions(idealAnswers(id)));
+    assert.equal(first.id, id);
+    assert.equal(first.match, 100);
+    assert.ok(second.match < 100, `${id} ties with ${second.id}`);
+  }
+});
+
+test('archetypeImage returns null until artwork is marked ready', () => {
+  assert.equal(archetypeImage('star'), null);
 });
 
 test('publicPersona never leaks the system prompt', () => {
-  const p = publicPersona('C');
+  const p = publicPersona('robot');
   assert.deepEqual(Object.keys(p).sort(), ['intro', 'name', 'opening']);
 });
 
@@ -58,7 +89,7 @@ test('validateMessages rejects malformed transcripts', () => {
 });
 
 test('isPersonaId', () => {
-  assert.equal(isPersonaId('D'), true);
+  assert.equal(isPersonaId('dark-empath'), true);
   assert.equal(isPersonaId('X'), false);
   assert.equal(isPersonaId(1), false);
 });
