@@ -37,14 +37,14 @@ function shuffle(arr) {
 const store = {
   get(key, fallback) {
     try {
-      const raw = localStorage.getItem(`kpv3:${key}`);
+      const raw = localStorage.getItem(`kpv4:${key}`);
       return raw == null ? fallback : JSON.parse(raw);
     } catch {
       return fallback;
     }
   },
   set(key, value) {
-    try { localStorage.setItem(`kpv3:${key}`, JSON.stringify(value)); } catch { /* storage unavailable: non-critical */ }
+    try { localStorage.setItem(`kpv4:${key}`, JSON.stringify(value)); } catch { /* storage unavailable: non-critical */ }
   },
 };
 
@@ -76,6 +76,12 @@ function chip(id) {
   return `${a.emoji} ${a.name}`;
 }
 
+/** Saved test result, or null if missing or made with archetypes that no longer exist. */
+function loadResult() {
+  const r = store.get('result', null);
+  return r?.ranked?.every((x) => x.id in ARCHETYPES) ? r : null;
+}
+
 /* ---------- Telegram Mini App ---------- */
 
 const tg = window.Telegram?.WebApp;
@@ -102,7 +108,7 @@ document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click'
 /* ---------- home: archetype cards ---------- */
 
 function renderHome() {
-  const my = store.get('result', null);
+  const my = loadResult();
   const cases = store.get('cases', { right: 0, total: 0 });
   const dialogs = store.get('dialogs', { right: 0, total: 0 });
   mount(
@@ -117,6 +123,7 @@ function renderHome() {
       media(id),
       h('div', { class: 'arch-body' }, [
         h('h3', { text: a.name }),
+        h('span', { class: 'arch-aka', text: a.aka }),
         h('p', { class: 'arch-tagline', text: a.tagline }),
         h('span', { class: 'arch-construct', text: a.construct }),
       ]),
@@ -140,6 +147,7 @@ function renderType(id) {
       h('div', {}, [
         h('span', { class: 'eyebrow', text: a.construct }),
         h('h1', { class: 'display', text: a.name }),
+        h('p', { class: 'aka', text: `В соцсетях: ${a.aka}` }),
         h('p', { class: 'lead', text: a.tagline }),
         h('div', { class: 'row' }, [
           h('button', { class: 'btn btn-primary', text: `Потренироваться с ним`, on: { click: () => go('dialog', id) } }),
@@ -164,7 +172,7 @@ let testState = null;
 
 function renderTest() {
   if (!testState) {
-    const saved = store.get('result', null);
+    const saved = loadResult();
     if (saved) return renderTestResult(saved);
     testState = { i: 0, answers: [] };
   }

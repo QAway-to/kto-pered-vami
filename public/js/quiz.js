@@ -48,14 +48,11 @@ export const PROTOTYPES = {
   'grandiose-narcissist': { high: ['GNARC'], low: ['VNARC', 'ANX'] },
   'vulnerable-narcissist': { high: ['VNARC', 'EMO', 'ANX'], low: ['AEMP'] },
   machiavellian: { high: ['MACH', 'CEMP'], low: ['AEMP', 'EMO'] },
-  psychopath: { high: ['PSY', 'MACH'], low: ['AEMP', 'ANX'] },
-  sadist: { high: ['SAD', 'PSY'], low: ['AEMP', 'LIGHT'] },
-  borderline: { high: ['EMO', 'ANX', 'AEMP'], low: [] },
-  anxious: { high: ['ANX', 'AEMP', 'LIGHT'], low: ['MACH'] },
-  avoidant: { high: ['AVO'], low: ['ANX'] },
+  psychopath: { high: ['PSY', 'SAD', 'MACH'], low: ['AEMP', 'ANX'] },
+  borderline: { high: ['EMO', 'ANX', 'AEMP'], low: ['AVO'] },
+  avoidant: { high: ['AVO', 'ALEX'], low: ['ANX'] },
   hsp: { high: ['SPS', 'AEMP'], low: ['PSY'] },
-  alexithymic: { high: ['ALEX'], low: ['CEMP'] },
-  'light-triad': { high: ['LIGHT', 'AEMP'], low: ['MACH', 'GNARC', 'PSY', 'SAD'] },
+  secure: { high: ['LIGHT'], low: ['ANX', 'AVO', 'EMO', 'MACH'] },
 };
 
 /**

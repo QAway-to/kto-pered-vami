@@ -177,7 +177,7 @@ h3 { font: 500 20px/1.3 var(--sans); color: var(--ink); margin: 6px 0 8px; }
 
 /* ---------- archetypes ---------- */
 .hero-actions { margin: 20px 0 8px; }
-.archetype-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; margin-top: 32px; }
+.archetype-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 32px; }
 .arch-card {
   min-width: 0; display: flex; flex-direction: column; text-align: left; padding: 0; overflow: hidden;
   background: var(--surface-card); border: 1px solid var(--hairline); border-radius: var(--r-lg);
@@ -241,3 +241,6 @@ h3 { font: 500 20px/1.3 var(--sans); color: var(--ink); margin: 6px 0 8px; }
   .media-lg { max-width: 200px; }
   .bar { grid-template-columns: 130px 1fr 40px; }
 }
+
+.arch-aka { font-size: 12px; font-weight: 500; color: var(--primary); }
+.aka { margin: -4px 0 8px; font-size: 14px; font-weight: 500; color: var(--primary); }
