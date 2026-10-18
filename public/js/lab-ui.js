@@ -9,9 +9,9 @@ const HISTORY_LIMIT = 200;
 const SPEED_KEY = 'lab-speed';
 
 const SPEED_CONFIG = {
-  slow: { label: '🐢 Медленно', readBase: 2800, readPerChar: 16, typeDelay: 1800, judgingDelay: 2400 },
-  normal: { label: '⏱ В темпе', readBase: 1900, readPerChar: 10, typeDelay: 1300, judgingDelay: 1700 },
-  fast: { label: '⚡ Быстро', readBase: 700, readPerChar: 4, typeDelay: 500, judgingDelay: 800 },
+  slow: { label: '🐢 Медленно', readBase: 2000, readPerChar: 10, typeDelay: 1100, judgingDelay: 2000, charMs: 32, pauseEnd: 180, pauseMid: 90 },
+  normal: { label: '⏱ В темпе', readBase: 1300, readPerChar: 7, typeDelay: 800, judgingDelay: 1500, charMs: 18, pauseEnd: 120, pauseMid: 60 },
+  fast: { label: '⚡ Быстро', readBase: 500, readPerChar: 3, typeDelay: 400, judgingDelay: 700, charMs: 6, pauseEnd: 40, pauseMid: 20 },
 };
 
 function getReadingDelay(text, speed = 'normal') {
@@ -26,6 +26,33 @@ function getTypingDelay(speed = 'normal') {
 
 function getJudgingDelay(speed = 'normal') {
   return (SPEED_CONFIG[speed] ?? SPEED_CONFIG.normal).judgingDelay;
+}
+
+async function streamText(fullText, speed, token) {
+  const chat = document.querySelector('.lab-chat');
+  const lastLine = chat?.querySelector('.lab-line:last-of-type .lab-text');
+  const cfg = SPEED_CONFIG[speed] ?? SPEED_CONFIG.normal;
+  const chars = Array.from(fullText);
+  let current = '';
+
+  for (let i = 0; i < chars.length; i += 1) {
+    if (token !== runToken) return current;
+    const ch = chars[i];
+    current += ch;
+
+    if (lastLine) {
+      lastLine.textContent = current;
+      if (stickToBottom && chat) chat.scrollTop = chat.scrollHeight;
+    }
+
+    let delay = cfg.charMs;
+    if ('.!?'.includes(ch)) delay += cfg.pauseEnd;
+    else if (',;:—'.includes(ch)) delay += cfg.pauseMid;
+
+    await sleep(delay, token);
+  }
+
+  return current;
 }
 
 function sleep(ms, token) {
@@ -110,49 +137,55 @@ async function runExperiment(resume = false) {
   const token = (runToken += 1);
   stickToBottom = true;
   const transcript = resume && state.run ? state.run.transcript : [];
-  setState({ run: { transcript, status: 'running', typing: true, verdict: null, error: null } });
+  setState({ run: { transcript, status: 'running', typing: true, streaming: false, verdict: null, error: null } });
 
   try {
     let lines = transcript;
     while (lines.length < LAB_TURNS) {
       if (lines.length > 0) {
-        setState({ run: { ...state.run, typing: false } });
+        setState({ run: { ...state.run, typing: false, streaming: false } });
         const prev = lines[lines.length - 1];
         await sleep(getReadingDelay(prev?.text, state.speed), token);
         if (token !== runToken) return;
       }
 
-      setState({ run: { ...state.run, typing: true } });
+      setState({ run: { ...state.run, typing: true, streaming: false } });
       const turnPromise = api('/lab/turn', { a, b, scenario, intro, transcript: lines });
       const typingWait = sleep(getTypingDelay(state.speed), token);
       const [{ speaker, text }] = await Promise.all([turnPromise, typingWait]);
       if (token !== runToken) return;
 
-      lines = [...lines, { speaker, text }];
-      setState({ run: { ...state.run, transcript: lines, typing: false } });
+      lines = [...lines, { speaker, text: '' }];
+      setState({ run: { ...state.run, transcript: lines, typing: false, streaming: true } });
+
+      const streamedText = await streamText(text, state.speed, token);
+      if (token !== runToken) return;
+
+      lines[lines.length - 1] = { speaker, text: streamedText };
+      setState({ run: { ...state.run, transcript: lines, streaming: false } });
     }
 
     const finalLine = lines[lines.length - 1];
     await sleep(getReadingDelay(finalLine?.text, state.speed), token);
     if (token !== runToken) return;
 
-    setState({ run: { ...state.run, status: 'judging', typing: true } });
+    setState({ run: { ...state.run, status: 'judging', typing: true, streaming: false } });
     const verdictPromise = api('/lab/verdict', { a, b, scenario, intro, transcript: lines });
     const judgingWait = sleep(getJudgingDelay(state.speed), token);
     const [verdict] = await Promise.all([verdictPromise, judgingWait]);
     if (token !== runToken) return;
 
     saveResult({ a, b, scenario, verdict });
-    setState({ run: { ...state.run, status: 'done', typing: false, verdict } });
+    setState({ run: { ...state.run, status: 'done', typing: false, streaming: false, verdict } });
   } catch (err) {
     if (token !== runToken) return;
-    setState({ run: { ...state.run, status: 'error', typing: false, error: err.message } });
+    setState({ run: { ...state.run, status: 'error', typing: false, streaming: false, error: err.message } });
   }
 }
 
 function stop() {
   runToken += 1;
-  if (state.run) setState({ run: { ...state.run, status: 'stopped' } });
+  if (state.run) setState({ run: { ...state.run, status: 'stopped', typing: false, streaming: false } });
 }
 
 function saveResult({ a, b, scenario, verdict }) {
@@ -230,11 +263,16 @@ function scenarioView() {
 
 function chatView() {
   const { run, a, b } = state;
-  const chat = h('div', { class: 'chat lab-chat', attrs: { 'aria-live': 'polite' } }, run.transcript.map((l) => {
+  const chat = h('div', { class: 'chat lab-chat', attrs: { 'aria-live': 'polite' } }, run.transcript.map((l, i) => {
     const id = l.speaker === 'a' ? a : b;
+    const isStreaming = run.streaming && i === run.transcript.length - 1;
     return h('div', { class: `lab-line lab-${l.speaker}` }, [
       media(id, 'media-sm'),
-      h('div', { class: 'msg' }, [h('strong', { text: firstName(id) }), h('span', { text: l.text })]),
+      h('div', { class: 'msg' }, [
+        h('strong', { text: firstName(id) }),
+        h('span', { class: 'lab-text', text: l.text }),
+        isStreaming && h('span', { class: 'stream-caret' }),
+      ].filter(Boolean)),
     ]);
   }));
   if (run.status === 'running' && run.typing) {
