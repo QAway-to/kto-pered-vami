@@ -45,17 +45,17 @@ export const LIKERT = Object.freeze(['Совсем не про меня', 'Ск�
 // Each archetype is a prototype: dimensions expected high and low.
 export const PROTOTYPES = {
   'dark-empath': { high: ['MACH', 'GNARC', 'CEMP', 'AEMP'], low: [] },
-  star: { high: ['GNARC'], low: ['VNARC', 'ANX'] },
-  covert: { high: ['VNARC', 'EMO', 'ANX'], low: ['AEMP'] },
-  strategist: { high: ['MACH', 'CEMP'], low: ['AEMP', 'EMO'] },
-  predator: { high: ['PSY', 'MACH'], low: ['AEMP', 'ANX'] },
-  troll: { high: ['SAD', 'PSY'], low: ['AEMP', 'LIGHT'] },
-  swings: { high: ['EMO', 'ANX', 'AEMP'], low: [] },
-  pleaser: { high: ['ANX', 'AEMP', 'LIGHT'], low: ['MACH'] },
+  'grandiose-narcissist': { high: ['GNARC'], low: ['VNARC', 'ANX'] },
+  'vulnerable-narcissist': { high: ['VNARC', 'EMO', 'ANX'], low: ['AEMP'] },
+  machiavellian: { high: ['MACH', 'CEMP'], low: ['AEMP', 'EMO'] },
+  psychopath: { high: ['PSY', 'MACH'], low: ['AEMP', 'ANX'] },
+  sadist: { high: ['SAD', 'PSY'], low: ['AEMP', 'LIGHT'] },
+  borderline: { high: ['EMO', 'ANX', 'AEMP'], low: [] },
+  anxious: { high: ['ANX', 'AEMP', 'LIGHT'], low: ['MACH'] },
   avoidant: { high: ['AVO'], low: ['ANX'] },
-  sensitive: { high: ['SPS', 'AEMP'], low: ['PSY'] },
-  robot: { high: ['ALEX'], low: ['CEMP'] },
-  light: { high: ['LIGHT', 'AEMP'], low: ['MACH', 'GNARC', 'PSY', 'SAD'] },
+  hsp: { high: ['SPS', 'AEMP'], low: ['PSY'] },
+  alexithymic: { high: ['ALEX'], low: ['CEMP'] },
+  'light-triad': { high: ['LIGHT', 'AEMP'], low: ['MACH', 'GNARC', 'PSY', 'SAD'] },
 };
 
 /**

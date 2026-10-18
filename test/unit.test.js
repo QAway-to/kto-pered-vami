@@ -59,11 +59,11 @@ test('each archetype prototype ranks itself first, strictly', () => {
 });
 
 test('archetypeImage returns null until artwork is marked ready', () => {
-  assert.equal(archetypeImage('star'), null);
+  assert.equal(archetypeImage('grandiose-narcissist'), null);
 });
 
 test('publicPersona never leaks the system prompt', () => {
-  const p = publicPersona('robot');
+  const p = publicPersona('alexithymic');
   assert.deepEqual(Object.keys(p).sort(), ['intro', 'name', 'opening']);
 });
 

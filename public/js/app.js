@@ -37,14 +37,14 @@ function shuffle(arr) {
 const store = {
   get(key, fallback) {
     try {
-      const raw = localStorage.getItem(`kpv2:${key}`);
+      const raw = localStorage.getItem(`kpv3:${key}`);
       return raw == null ? fallback : JSON.parse(raw);
     } catch {
       return fallback;
     }
   },
   set(key, value) {
-    try { localStorage.setItem(`kpv2:${key}`, JSON.stringify(value)); } catch { /* storage unavailable: non-critical */ }
+    try { localStorage.setItem(`kpv3:${key}`, JSON.stringify(value)); } catch { /* storage unavailable: non-critical */ }
   },
 };
 

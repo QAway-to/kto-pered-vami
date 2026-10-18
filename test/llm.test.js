@@ -80,10 +80,10 @@ test('DeepSeek body-read timeout is reported as a network failure', async () => 
 });
 
 test('end to end: /api/chat via DeepSeek, upstream 429 maps to 503', async () => {
-  const transcript = [{ role: 'assistant', content: PERSONAS.robot.opening }, { role: 'user', content: 'Проект на 2 недели' }];
+  const transcript = [{ role: 'assistant', content: PERSONAS.alexithymic.opening }, { role: 'user', content: 'Проект на 2 недели' }];
   const okApp = createApp({ llm: createDeepSeekProvider({ apiKey: 'k', fetchImpl: fakeFetch(() => completion('Какие сроки?')).impl }) });
-  const res = await request(okApp).post('/api/chat').send({ personaId: 'robot', messages: transcript }).expect(200);
+  const res = await request(okApp).post('/api/chat').send({ personaId: 'alexithymic', messages: transcript }).expect(200);
   assert.equal(res.body.data.reply, 'Какие сроки?');
   const busyApp = createApp({ llm: createDeepSeekProvider({ apiKey: 'k', fetchImpl: fakeFetch(() => jsonResponse(429, {})).impl }) });
-  await request(busyApp).post('/api/chat').send({ personaId: 'robot', messages: transcript }).expect(503);
+  await request(busyApp).post('/api/chat').send({ personaId: 'alexithymic', messages: transcript }).expect(503);
 });
