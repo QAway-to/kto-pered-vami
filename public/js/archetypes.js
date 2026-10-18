@@ -158,7 +158,7 @@ export const ARCHETYPES = {
 export const ARCHETYPE_IDS = Object.freeze(Object.keys(ARCHETYPES));
 
 // Add an id here once /img/archetypes/<id>.webp exists; until then the card shows an emoji placeholder.
-export const IMAGES_READY = new Set([]);
+export const IMAGES_READY = new Set(ARCHETYPE_IDS);
 
 /** @param {string} id */
 export const archetypeImage = (id) => (IMAGES_READY.has(id) ? `/img/archetypes/${id}.webp` : null);

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { ARCHETYPES, ARCHETYPE_IDS, archetypeImage } from '../public/js/archetypes.js';
 import { QUESTIONS, DIM_KEYS, PROTOTYPES, scoreDimensions, rankArchetypes } from '../public/js/quiz.js';
 import { CASES } from '../public/js/cases.js';
@@ -58,8 +59,13 @@ test('each archetype prototype ranks itself first, strictly', () => {
   }
 });
 
-test('archetypeImage returns null until artwork is marked ready', () => {
-  assert.equal(archetypeImage('grandiose-narcissist'), null);
+test('every archetype has its portrait file on disk', () => {
+  assert.equal(archetypeImage('no-such-type'), null);
+  for (const id of ARCHETYPE_IDS) {
+    const src = archetypeImage(id);
+    assert.equal(src, `/img/archetypes/${id}.webp`);
+    assert.ok(existsSync(new URL(`../public${src}`, import.meta.url)), `missing ${src}`);
+  }
 });
 
 test('publicPersona never leaks the system prompt', () => {
