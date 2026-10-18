@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
-import Anthropic from '@anthropic-ai/sdk';
+import { LlmError } from './llm.js';
 import { PERSONAS, PERSONA_IDS, publicPersona } from './personas.js';
 import { validateMessages, isPersonaId, MAX_ASSISTANT_CHARS } from './validate.js';
 import { createRateLimiter } from './rateLimit.js';
@@ -10,7 +10,6 @@ import { TYPES, TYPE_KEYS } from '../public/js/disc.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(here, '..', 'public');
 
-export const MODEL = 'claude-opus-5-5';
 
 const ok = (data) => ({ success: true, data, error: null });
 const fail = (error) => ({ success: false, data: null, error });
@@ -30,35 +29,10 @@ const CSP = [
 ].join('; ');
 
 /**
- * Calls Claude and returns the reply text, or null when the model declined.
- * @param {Anthropic} client
- * @param {{system: string, messages: Anthropic.MessageParam[], effort: 'low'|'medium', maxTokens: number}} params
- * @returns {Promise<string|null>}
- */
-async function askClaude(client, { system, messages, effort, maxTokens }) {
-  const response = await client.beta.messages.create({
-    model: MODEL,
-    max_tokens: maxTokens,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    output_config: { effort },
-    system,
-    messages,
-  });
-  if (response.stop_reason === 'refusal') return null;
-  const text = response.content
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-    .trim();
-  return text || null;
-}
-
-/**
  * The browser keeps the transcript starting with the persona's opening line;
  * the API needs a user turn first, so we add a neutral scene-setting turn.
  * @param {{role: 'user'|'assistant', content: string}[]} transcript
- * @returns {Anthropic.MessageParam[]}
+ * @returns {{role: 'user'|'assistant', content: string}[]}
  */
 function toApiMessages(transcript) {
   const head = transcript[0].role === 'assistant' ? [{ role: 'user', content: '(Собеседник написал вам первым.)' }] : [];
@@ -97,10 +71,10 @@ function parseTranscript(personaId, messages) {
 }
 
 /**
- * @param {{client: Anthropic|null, rateLimit?: {windowMs: number, max: number}, aiCallsPerHour?: number}} deps
+ * @param {{llm: import('./llm.js').LlmProvider|null, rateLimit?: {windowMs: number, max: number}, aiCallsPerHour?: number}} deps
  * @returns {import('express').Express}
  */
-export function createApp({ client, rateLimit = { windowMs: 60_000, max: 20 }, aiCallsPerHour = 300 }) {
+export function createApp({ llm, rateLimit = { windowMs: 60_000, max: 20 }, aiCallsPerHour = 300 }) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1); // Render sits behind one proxy
@@ -124,8 +98,8 @@ export function createApp({ client, rateLimit = { windowMs: 60_000, max: 20 }, a
   });
 
   api.use((req, res, next) => {
-    if (req.method === 'POST' && !client) {
-      return res.status(503).json(fail('ИИ-диалоги не настроены: на сервере не задан ANTHROPIC_API_KEY.'));
+    if (req.method === 'POST' && !llm) {
+      return res.status(503).json(fail('ИИ-диалоги пока не подключены. Тест и кейсы доступны.'));
     }
     return next();
   });
@@ -146,10 +120,10 @@ export function createApp({ client, rateLimit = { windowMs: 60_000, max: 20 }, a
     if (!parsed.ok) return res.status(400).json(fail(parsed.error));
     if (parsed.value.at(-1).role !== 'user') return res.status(400).json(fail('Последняя реплика должна быть вашей'));
     try {
-      const reply = await askClaude(client, {
+      const reply = await llm.complete({
         system: PERSONAS[personaId].system,
         messages: toApiMessages(parsed.value),
-        effort: 'low',
+        mode: 'chat',
         maxTokens: 800,
       });
       const safeReply = reply ? reply.slice(0, MAX_ASSISTANT_CHARS) : null;
@@ -175,11 +149,11 @@ export function createApp({ client, rateLimit = { windowMs: 60_000, max: 20 }, a
 ${formatTranscript(parsed.value, persona.name)}
 </transcript>`;
     try {
-      const feedback = await askClaude(client, {
+      const feedback = await llm.complete({
         system: debriefSystem(),
         messages: [{ role: 'user', content: prompt }],
-        effort: 'medium',
-        maxTokens: 4096,
+        mode: 'analysis',
+        maxTokens: 8000, // includes reasoning tokens on thinking models
       });
       return res.json(ok({
         correct: guess === personaId,
@@ -196,11 +170,11 @@ ${formatTranscript(parsed.value, persona.name)}
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, _next) => {
-    if (err instanceof Anthropic.RateLimitError) {
+    if (err instanceof LlmError && err.status === 429) {
       return res.status(503).json(fail('ИИ сейчас перегружен. Попробуйте через минуту.'));
     }
-    if (err instanceof Anthropic.APIError) {
-      console.error(`Claude API error ${err.status}: ${err.message}`);
+    if (err instanceof LlmError) {
+      console.error(`LLM API error ${err.status}: ${err.message}`);
       return res.status(502).json(fail('Ошибка ИИ-сервиса. Попробуйте ещё раз.'));
     }
     if (err?.type === 'entity.parse.failed' || err?.type === 'entity.too.large') {

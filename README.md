@@ -10,17 +10,26 @@
 
 ```bash
 npm install
-ANTHROPIC_API_KEY=sk-ant-... npm start   # http://localhost:3000
+DEEPSEEK_API_KEY=sk-... npm start   # http://localhost:3000
 npm test
 ```
 
-Без `ANTHROPIC_API_KEY` тест и кейсы работают, а диалоги отключены.
+Без ключа тест и кейсы работают, а диалоги отключены.
+
+## ИИ-провайдер
+
+| `AI_PROVIDER` | Ключ | Модель | Назначение |
+|---|---|---|---|
+| `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-flash` | демо, дёшево |
+| `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-5-5` | продакшен |
+
+Переключение — одна переменная окружения, код менять не нужно. Если `AI_PROVIDER` не задан, берётся тот провайдер, чей ключ есть (DeepSeek в приоритете).
 
 ## Деплой на Render
 
 1. Render → **New → Blueprint** → выбрать этот репозиторий (`render.yaml` подхватится сам).
-2. Ввести `ANTHROPIC_API_KEY`.
-3. Поставить лимит трат в Anthropic Console. `AI_CALLS_PER_HOUR` (по умолчанию 300) — общий лимит ИИ-запросов в час на сервер.
+2. Ввести `DEEPSEEK_API_KEY`. Поле `ANTHROPIC_API_KEY` пока оставить пустым.
+3. Поставить лимит трат у провайдера. `AI_CALLS_PER_HOUR` (по умолчанию 300) — общий лимит ИИ-запросов в час на сервер.
 
 ## Telegram Mini App
 
@@ -28,4 +37,4 @@ npm test
 
 ## Стек
 
-Node 22, Express, `@anthropic-ai/sdk` (`claude-opus-5-5`, серверный fallback при отказах), чистый HTML/CSS/JS, дизайн-система Claude.
+Node 22, Express, DeepSeek (OpenAI-совместимый API) или `@anthropic-ai/sdk`, чистый HTML/CSS/JS, дизайн-система Claude.

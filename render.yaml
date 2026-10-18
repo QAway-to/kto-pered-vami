@@ -9,6 +9,11 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # deepseek (demo) | anthropic (production). Only the selected provider's key is needed.
+      - key: AI_PROVIDER
+        value: deepseek
+      - key: DEEPSEEK_API_KEY
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: AI_CALLS_PER_HOUR
