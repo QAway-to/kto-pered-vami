@@ -3,6 +3,7 @@
 import { PERSONAS, PERSONA_IDS } from './personas.js';
 import { ARCHETYPES } from '../public/js/archetypes.js';
 import { LAB_TURNS, SCENARIOS, SCENARIO_IDS, MOTIVES, OUTCOME_IDS } from '../public/js/lab-data.js';
+import { sceneText, sceneCue } from './scene.js';
 
 export const MAX_LINE_CHARS = 1500;
 const MIN_TURNS_FOR_VERDICT = 6;
@@ -67,13 +68,10 @@ export const nextSpeaker = (transcript) => (transcript.length % 2 === 0 ? 'a' : 
 export function labSystem(selfId, otherId, scenarioId, introIndex, role) {
   const self = PERSONAS[selfId];
   const other = PERSONAS[otherId];
-  const scenario = SCENARIOS[scenarioId];
-  const { text, cue } = scenario.intros[introIndex];
+  const opening = role === 'a' ? sceneCue(scenarioId, introIndex) : `Первым заговорит ${other.name}.`;
   return `${self.character}
 
-Ситуация: ${scenario.setting}
-Вступление: ${text}
-${role === 'a' ? cue : `Первым заговорит ${other.name}.`}
+${sceneText(scenarioId, introIndex, opening)}
 Твой собеседник — ${other.bio}.
 Твой скрытый мотив в этой сцене: ${MOTIVES[selfId]}.
 ${LAB_RULES}`;

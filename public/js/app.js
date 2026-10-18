@@ -1,7 +1,8 @@
 import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
 import { QUESTIONS, LIKERT, DIMENSIONS, DIM_KEYS, scoreDimensions, rankArchetypes } from './quiz.js';
 import { CASES } from './cases.js';
-import { h, mount, shuffle, store, api, media, chip } from './ui.js';
+import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard } from './ui.js';
+import { SCENARIO_IDS, SCENARIOS, randomIntro } from './lab-data.js';
 import { renderLab } from './lab-ui.js';
 
 /** Saved test result, or null if missing or made with archetypes that no longer exist. */
@@ -216,35 +217,69 @@ function renderCases() {
 
 let dialog = null;
 let startToken = 0;
+/** Scene chosen before the dialog starts; personaId null = hidden random persona. */
+let setup = { personaId: null, scenario: SCENARIO_IDS[0], intro: randomIntro(SCENARIO_IDS[0]) };
 
-/** @param {string} [personaId] - known archetype; omitted = hidden random one */
-async function startDialog(personaId) {
+const sceneOf = (d) => ({ scenario: d.scenario, intro: d.intro });
+
+/** Opens the scene: picks the persona, then asks it for its opening line. */
+async function startDialog() {
+  const { personaId, scenario, intro } = setup;
+  const token = (startToken += 1);
   dialog = null;
   mount('dialog-body', h('p', { class: 'muted', text: 'Ищем собеседника…' }));
   try {
-    const token = (startToken += 1);
     const p = await api(`/persona/${personaId ?? 'random'}`);
     if (token !== startToken) return; // a newer dialog was started meanwhile
-    dialog = { persona: p, known: Boolean(personaId), messages: [{ role: 'assistant', content: p.opening }], busy: false, done: false };
+    dialog = { persona: p, known: Boolean(personaId), scenario, intro, messages: [], busy: true, done: false };
+    renderDialog();
+    const current = dialog;
+    const { reply } = await api('/chat', { personaId: p.personaId, ...sceneOf(current), messages: [] });
+    if (dialog !== current) return;
+    dialog = { ...dialog, messages: [{ role: 'assistant', content: reply }], busy: false };
     renderDialog();
   } catch (err) {
-    if (token === startToken) mount('dialog-body', h('p', { class: 'error', text: err.message }));
+    if (token !== startToken) return;
+    dialog = null;
+    mount('dialog-body', h('p', { class: 'error', text: err.message }), h('button', { class: 'btn btn-ghost', text: 'Назад', on: { click: () => renderDialog() } }));
   }
+}
+
+function renderSetup() {
+  const { personaId, scenario, intro } = setup;
+  const known = personaId && ARCHETYPES[personaId];
+  const opener = known ? ARCHETYPES[personaId].name : 'ваш собеседник';
+  mount(
+    'dialog-body',
+    h('span', { class: 'eyebrow', text: 'Главная тренировка' }),
+    h('h1', { class: 'display', text: known ? `Тренировка: ${known.name}` : 'Кто перед вами?' }),
+    h('p', {
+      class: 'lead',
+      text: known
+        ? 'Вы знаете архетип собеседника. Держите границы, подстраивайтесь и не поддавайтесь на его тактики. В конце — разбор от ИИ-тренера.'
+        : 'Вам достанется собеседник со скрытым архетипом. Пройдите сцену, держите границы и не поддавайтесь на манипуляции. Затем угадайте архетип и получите разбор от ИИ-тренера.',
+    }),
+    known && h('div', { class: 'persona' }, [media(personaId, 'media-sm'), h('h3', { text: known.name })]),
+    h('h3', { text: 'Стадия отношений' }),
+    sceneChips({ scenario, onPick: (sid) => { setup = { ...setup, scenario: sid, intro: randomIntro(sid) }; renderSetup(); } }),
+    introCard({ scenario, intro, opener, onReroll: () => { setup = { ...setup, intro: randomIntro(scenario, intro) }; renderSetup(); } }),
+    h('div', { class: 'row' }, [
+      h('button', { class: 'btn btn-primary', text: known ? 'Начать сцену' : 'Случайный собеседник', on: { click: () => startDialog() } }),
+      known && h('button', { class: 'btn btn-ghost', text: 'Скрытый собеседник', on: { click: () => { setup = { ...setup, personaId: null }; renderSetup(); } } }),
+    ]),
+  );
 }
 
 function renderDialog(personaId) {
   if (typeof personaId === 'string') {
-    startDialog(personaId);
+    dialog = null;
+    startToken += 1;
+    setup = { ...setup, personaId };
+    renderSetup();
     return;
   }
   if (!dialog) {
-    mount(
-      'dialog-body',
-      h('span', { class: 'eyebrow', text: 'Главная тренировка' }),
-      h('h1', { class: 'display', text: 'Договоритесь с незнакомцем' }),
-      h('p', { class: 'lead', text: 'Вам достанется случайный участник сообщества со скрытым архетипом. Предложите ему совместный проект, держите границы и не поддавайтесь на манипуляции. Затем угадайте архетип и получите разбор от ИИ-тренера.' }),
-      h('button', { class: 'btn btn-primary', text: 'Случайный собеседник', on: { click: () => startDialog() } }),
-    );
+    renderSetup();
     return;
   }
 
@@ -261,8 +296,9 @@ function renderDialog(personaId) {
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input.value); }
   });
-  input.disabled = dialog.busy || dialog.done;
-  send.disabled = dialog.busy || dialog.done;
+  const waiting = dialog.busy || dialog.done || dialog.messages.length === 0;
+  input.disabled = waiting;
+  send.disabled = waiting;
 
   const userTurns = dialog.messages.filter((m) => m.role === 'user').length;
   const locked = userTurns < 3 || dialog.busy || dialog.done;
@@ -287,9 +323,10 @@ function renderDialog(personaId) {
       dialog.known ? media(persona.personaId, 'media-sm') : h('div', { class: 'avatar', text: persona.name[0] }),
       h('div', {}, [
         h('h3', { text: dialog.known ? `${persona.name} · ${ARCHETYPES[persona.personaId].name}` : persona.name }),
-        h('p', { class: 'muted', text: persona.intro }),
+        h('p', { class: 'muted', text: persona.bio }),
       ]),
     ]),
+    h('p', { class: 'scene-line', text: `${SCENARIOS[dialog.scenario].emoji} ${SCENARIOS[dialog.scenario].intros[dialog.intro].text}` }),
     chat,
     h('div', { class: 'composer' }, [input, send]),
     dialog.error && h('p', { class: 'error', text: dialog.error }),
@@ -307,7 +344,7 @@ async function sendMessage(raw) {
   const current = dialog;
   renderDialog();
   try {
-    const { reply } = await api('/chat', { personaId: current.persona.personaId, messages });
+    const { reply } = await api('/chat', { personaId: current.persona.personaId, ...sceneOf(current), messages });
     if (dialog !== current) return; // user moved on to another dialog
     dialog = { ...dialog, messages: [...messages, { role: 'assistant', content: reply }], busy: false };
   } catch (err) {
@@ -325,6 +362,7 @@ async function finishDialog(guessId) {
   try {
     const result = await api('/debrief', {
       personaId: current.persona.personaId,
+      ...sceneOf(current),
       messages: current.messages,
       guess: guessId,
       known: current.known,
@@ -350,7 +388,7 @@ function renderDebrief(result) {
     h('h3', { text: `${dialog.persona.name} — ${chip(result.actual)}` }),
     h('p', { class: 'feedback', text: result.feedback }),
     h('div', { class: 'row' }, [
-      h('button', { class: 'btn btn-primary', text: 'Новый собеседник', on: { click: () => startDialog() } }),
+      h('button', { class: 'btn btn-primary', text: 'Новая сцена', on: { click: () => { dialog = null; setup = { ...setup, intro: randomIntro(setup.scenario, setup.intro) }; renderSetup(); } } }),
       h('button', { class: 'btn btn-ghost', text: `Об архетипе «${a.name}»`, on: { click: () => go('type', result.actual) } }),
     ]),
   ]);

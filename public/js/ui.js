@@ -1,6 +1,7 @@
 // Shared browser helpers: DOM builder, API client, storage and archetype artwork.
 
 import { ARCHETYPES, archetypeImage } from './archetypes.js';
+import { SCENARIOS, SCENARIO_IDS } from './lab-data.js';
 
 /**
  * Tiny DOM builder. Text is always set via textContent (no innerHTML → no XSS).
@@ -72,4 +73,27 @@ export function media(id, size = '') {
 export function chip(id) {
   const a = ARCHETYPES[id];
   return `${a.emoji} ${a.name}`;
+}
+
+/** Relationship-stage picker. */
+export function sceneChips({ scenario, disabled = false, onPick }) {
+  return h('div', { class: 'chips' }, SCENARIO_IDS.map((sid) => h('button', {
+    class: `chip ${scenario === sid ? 'is-active' : ''}`,
+    text: `${SCENARIOS[sid].emoji} ${SCENARIOS[sid].title}`,
+    attrs: disabled ? { disabled: '' } : {},
+    on: { click: () => onPick(sid) },
+  })));
+}
+
+/** The written intro of a scene, with a reroll button. */
+export function introCard({ scenario, intro, opener, disabled = false, onReroll }) {
+  const { setting, intros } = SCENARIOS[scenario];
+  return h('div', { class: 'card intro' }, [
+    h('div', { class: 'row intro-head' }, [
+      h('span', { class: 'eyebrow', text: 'Вступление' }),
+      h('button', { class: 'back', text: '🎲 Другое вступление', attrs: disabled ? { disabled: '' } : {}, on: { click: onReroll } }),
+    ]),
+    h('p', { class: 'intro-text', text: intros[intro].text }),
+    h('p', { class: 'muted small', text: `${setting} Первым заговаривает ${opener}.` }),
+  ]);
 }

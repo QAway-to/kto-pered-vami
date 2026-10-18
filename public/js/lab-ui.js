@@ -1,18 +1,11 @@
 // Lab UI: drag two archetypes into the arena, watch them talk, get a game-theory verdict, build a "who beats whom" matrix.
 
 import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
-import { LAB_TURNS, SCENARIOS, SCENARIO_IDS, MOTIVES, OUTCOMES, PERSONA_NAMES } from './lab-data.js';
-import { h, mount, store, api, media } from './ui.js';
+import { LAB_TURNS, SCENARIO_IDS, MOTIVES, OUTCOMES, PERSONA_NAMES, randomIntro } from './lab-data.js';
+import { h, mount, store, api, media, sceneChips, introCard } from './ui.js';
 
 const HISTORY_KEY = 'lab-history';
 const HISTORY_LIMIT = 200;
-
-/** Random intro index for a scenario, different from `current` when there is a choice. */
-function randomIntro(scenarioId, current = -1) {
-  const n = SCENARIOS[scenarioId].intros.length;
-  const options = [...Array(n).keys()].filter((i) => i !== current);
-  return options[Math.floor(Math.random() * options.length)] ?? 0;
-}
 
 /** @type {{a: string|null, b: string|null, scenario: string, intro: number, run: any}} */
 let state = { a: null, b: null, scenario: SCENARIO_IDS[0], intro: randomIntro(SCENARIO_IDS[0]), run: null };
@@ -104,23 +97,14 @@ function saveResult({ a, b, scenario, verdict }) {
 
 function introView() {
   const { scenario, intro, a } = state;
-  const { setting, intros } = SCENARIOS[scenario];
-  const opener = a ? firstName(a) : 'Игрок A';
-  return h('div', { class: 'card intro' }, [
-    h('div', { class: 'row intro-head' }, [
-      h('span', { class: 'eyebrow', text: 'Вступление' }),
-      h('button', {
-        class: 'back',
-        text: '🎲 Другое вступление',
-        attrs: isRunning() ? { disabled: '' } : {},
-        on: { click: () => setState({ intro: randomIntro(scenario, intro), run: null }) },
-      }),
-    ]),
-    h('p', { class: 'intro-text', text: intros[intro].text }),
-    h('p', { class: 'muted small', text: `${setting} Первым заговаривает ${opener}.` }),
-  ]);
+  return introCard({
+    scenario,
+    intro,
+    opener: a ? firstName(a) : 'Игрок A',
+    disabled: isRunning(),
+    onReroll: () => setState({ intro: randomIntro(scenario, intro), run: null }),
+  });
 }
-
 
 function slotView(slot) {
   const id = state[slot];
@@ -166,12 +150,11 @@ function rosterView() {
 }
 
 function scenarioView() {
-  return h('div', { class: 'chips' }, SCENARIO_IDS.map((sid) => h('button', {
-    class: `chip ${state.scenario === sid ? 'is-active' : ''}`,
-    text: `${SCENARIOS[sid].emoji} ${SCENARIOS[sid].title}`,
-    attrs: isRunning() ? { disabled: '' } : {},
-    on: { click: () => setState({ scenario: sid, intro: randomIntro(sid), run: null }) },
-  })));
+  return sceneChips({
+    scenario: state.scenario,
+    disabled: isRunning(),
+    onPick: (sid) => setState({ scenario: sid, intro: randomIntro(sid), run: null }),
+  });
 }
 
 function chatView() {

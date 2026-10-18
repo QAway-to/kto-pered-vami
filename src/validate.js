@@ -7,12 +7,13 @@ export const MAX_TOTAL_CHARS = 15000;
 
 /**
  * Validates a chat transcript coming from the browser.
- * The transcript starts with the persona's opening line (assistant) and alternates.
+ * The persona opens the scene, so a non-empty transcript starts with an assistant line and alternates.
  * @param {unknown} messages
+ * @param {{allowEmpty?: boolean}} [opts] - empty means "ask the persona for its opening line"
  * @returns {{ok: true, value: {role: 'user'|'assistant', content: string}[]} | {ok: false, error: string}}
  */
-export function validateMessages(messages) {
-  if (!Array.isArray(messages) || messages.length === 0) {
+export function validateMessages(messages, { allowEmpty = false } = {}) {
+  if (!Array.isArray(messages) || (messages.length === 0 && !allowEmpty)) {
     return { ok: false, error: 'messages must be a non-empty array' };
   }
   if (messages.length > MAX_MESSAGES) {

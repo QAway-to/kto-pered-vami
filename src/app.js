@@ -2,14 +2,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { LlmError } from './llm.js';
-import { PERSONAS, PERSONA_IDS, publicPersona } from './personas.js';
+import { PERSONAS, PERSONA_IDS, publicPersona, trainerSystem } from './personas.js';
+import { isScene, sceneCue, sceneSummary } from './scene.js';
 import { validateMessages, isPersonaId, MAX_ASSISTANT_CHARS } from './validate.js';
 import { createRateLimiter } from './rateLimit.js';
 import {
   validateLabRequest, nextSpeaker, labSystem, labMessages, verdictPrompt, parseVerdict, MAX_LINE_CHARS,
 } from './lab.js';
 import { ARCHETYPES, ARCHETYPE_IDS } from '../public/js/archetypes.js';
-import { SCENARIOS } from '../public/js/lab-data.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(here, '..', 'public');
@@ -33,14 +33,13 @@ const CSP = [
 ].join('; ');
 
 /**
- * The browser keeps the transcript starting with the persona's opening line;
- * the API needs a user turn first, so we add a neutral scene-setting turn.
+ * The persona opens the scene; the API needs a user turn first, so the scene cue goes there.
  * @param {{role: 'user'|'assistant', content: string}[]} transcript
+ * @param {string} cue
  * @returns {{role: 'user'|'assistant', content: string}[]}
  */
-function toApiMessages(transcript) {
-  const head = transcript[0].role === 'assistant' ? [{ role: 'user', content: '(Собеседник написал вам первым.)' }] : [];
-  return [...head, ...transcript];
+function toApiMessages(transcript, cue) {
+  return [{ role: 'user', content: `(Сцена начинается. ${cue})` }, ...transcript];
 }
 
 // Angle brackets are swapped so a message cannot close the <transcript> delimiter.
@@ -67,13 +66,15 @@ function debriefSystem() {
 }
 
 /**
- * Validates a transcript for a persona: shape, size, and that it starts with that persona's opening line.
+ * Validates a trainer transcript: shape, size, and that the persona spoke first.
+ * @param {unknown} messages
+ * @param {{allowEmpty?: boolean}} [opts]
  * @returns {{ok: true, value: {role: 'user'|'assistant', content: string}[]} | {ok: false, error: string}}
  */
-function parseTranscript(personaId, messages) {
-  const parsed = validateMessages(messages);
+function parseTranscript(messages, opts) {
+  const parsed = validateMessages(messages, opts);
   if (!parsed.ok) return parsed;
-  if (parsed.value[0].content !== PERSONAS[personaId].opening.trim()) {
+  if (parsed.value.length > 0 && parsed.value[0].role !== 'assistant') {
     return { ok: false, error: 'Диалог повреждён. Начните новый.' };
   }
   return parsed;
@@ -128,15 +129,19 @@ export function createApp({
   });
 
   api.post('/chat', aiBudget, async (req, res, next) => {
-    const { personaId, messages } = req.body ?? {};
+    const { personaId, scenario, intro, messages } = req.body ?? {};
     if (!isPersonaId(personaId)) return res.status(400).json(fail('Неизвестный персонаж'));
-    const parsed = parseTranscript(personaId, messages);
+    if (!isScene(scenario, intro)) return res.status(400).json(fail('Неизвестная сцена'));
+    // An empty transcript asks the persona for its opening line.
+    const parsed = parseTranscript(messages, { allowEmpty: true });
     if (!parsed.ok) return res.status(400).json(fail(parsed.error));
-    if (parsed.value.at(-1).role !== 'user') return res.status(400).json(fail('Последняя реплика должна быть вашей'));
+    if (parsed.value.length > 0 && parsed.value.at(-1).role !== 'user') {
+      return res.status(400).json(fail('Последняя реплика должна быть вашей'));
+    }
     try {
       const reply = await llm.complete({
-        system: PERSONAS[personaId].system,
-        messages: toApiMessages(parsed.value),
+        system: trainerSystem(personaId, scenario, intro),
+        messages: toApiMessages(parsed.value, sceneCue(scenario, intro)),
         mode: 'chat',
         maxTokens: 800,
       });
@@ -148,16 +153,18 @@ export function createApp({
   });
 
   api.post('/debrief', aiBudget, async (req, res, next) => {
-    const { personaId, messages, guess, known } = req.body ?? {};
+    const { personaId, scenario, intro, messages, guess, known } = req.body ?? {};
     if (!isPersonaId(personaId)) return res.status(400).json(fail('Неизвестный персонаж'));
+    if (!isScene(scenario, intro)) return res.status(400).json(fail('Неизвестная сцена'));
     if (!ARCHETYPE_IDS.includes(guess)) return res.status(400).json(fail('Выберите архетип'));
-    const parsed = parseTranscript(personaId, messages);
+    const parsed = parseTranscript(messages);
     if (!parsed.ok) return res.status(400).json(fail(parsed.error));
     if (!parsed.value.some((m) => m.role === 'user')) {
       return res.status(400).json(fail('Сначала напишите хотя бы одну реплику'));
     }
     const persona = PERSONAS[personaId];
-    const prompt = `Персонаж: ${persona.name}. Настоящий архетип: ${ARCHETYPES[personaId].name} (${ARCHETYPES[personaId].construct}).
+    const prompt = `Сцена: ${sceneSummary(scenario, intro)}
+Персонаж: ${persona.name}. Настоящий архетип: ${ARCHETYPES[personaId].name} (${ARCHETYPES[personaId].construct}).
 ${known === true ? 'Пользователь знал архетип заранее и тренировался с ним — пропусти пункт 1.' : `Ответ пользователя: ${ARCHETYPES[guess].name}.`}
 <transcript>
 ${formatTranscript(parsed.value, persona.name)}
@@ -195,7 +202,7 @@ ${formatTranscript(parsed.value, persona.name)}
     try {
       const line = await llm.complete({
         system: labSystem(self, other, scenario, intro, speaker),
-        messages: labMessages(transcript, speaker, SCENARIOS[scenario].intros[intro].cue),
+        messages: labMessages(transcript, speaker, sceneCue(scenario, intro)),
         mode: 'chat',
         maxTokens: 600,
       });

@@ -108,3 +108,10 @@ export const PERSONA_NAMES = {
   hsp: 'Соня',
   secure: 'Марина',
 };
+
+/** Random intro index for a scenario, different from `current` when there is a choice. */
+export function randomIntro(scenarioId, current = -1) {
+  const n = SCENARIOS[scenarioId].intros.length;
+  const options = [...Array(n).keys()].filter((i) => i !== current);
+  return options[Math.floor(Math.random() * options.length)] ?? 0;
+}

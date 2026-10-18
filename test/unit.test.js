@@ -70,7 +70,7 @@ test('every archetype has its portrait file on disk', () => {
 
 test('publicPersona never leaks the system prompt', () => {
   const p = publicPersona('avoidant');
-  assert.deepEqual(Object.keys(p).sort(), ['intro', 'name', 'opening']);
+  assert.deepEqual(Object.keys(p).sort(), ['bio', 'name']);
 });
 
 test('validateMessages accepts an alternating transcript and trims', () => {
