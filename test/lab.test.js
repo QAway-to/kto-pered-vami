@@ -4,14 +4,14 @@ import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { PERSONAS } from '../src/personas.js';
 import { ARCHETYPE_IDS } from '../public/js/archetypes.js';
-import { LAB_TURNS, SCENARIO_IDS, MOTIVES, PERSONA_NAMES } from '../public/js/lab-data.js';
+import { LAB_TURNS, SCENARIOS, SCENARIO_IDS, MOTIVES, PERSONA_NAMES } from '../public/js/lab-data.js';
 import {
   validateLabRequest, nextSpeaker, labSystem, labMessages, verdictPrompt, parseVerdict,
 } from '../src/lab.js';
 
 const line = (i) => ({ speaker: i % 2 === 0 ? 'a' : 'b', text: `реплика ${i}` });
 const transcriptOf = (n) => Array.from({ length: n }, (_, i) => line(i));
-const base = { a: 'grandiose-narcissist', b: 'secure', scenario: 'first-meeting' };
+const base = { a: 'grandiose-narcissist', b: 'secure', scenario: 'first-meeting', intro: 0 };
 
 /** Fake provider that records calls and answers with `reply(params)`. */
 function fakeLlm(reply) {
@@ -39,6 +39,9 @@ test('validateLabRequest accepts a valid request and enforces alternation and li
     { ...base, a: 'nobody', transcript: [] },
     { ...base, b: base.a, transcript: [] },
     { ...base, scenario: 'war', transcript: [] },
+    { ...base, intro: 99, transcript: [] },
+    { ...base, intro: '0', transcript: [] },
+    { a: base.a, b: base.b, scenario: base.scenario, transcript: [] },
     { ...base, transcript: 'x' },
     { ...base, transcript: [{ speaker: 'b', text: 'hi' }] },
     { ...base, transcript: [{ speaker: 'a', text: '' }] },
@@ -58,19 +61,34 @@ test('validateLabRequest for a verdict needs a long enough, finished-or-not conv
 test('turn order and perspective: own lines are assistant turns, A opens with a scene cue', () => {
   assert.equal(nextSpeaker([]), 'a');
   assert.equal(nextSpeaker(transcriptOf(1)), 'b');
-  const forA = labMessages(transcriptOf(2), 'a');
+  const forA = labMessages(transcriptOf(2), 'a', 'Ты заговариваешь первым.');
   assert.deepEqual(forA.map((m) => m.role), ['user', 'assistant', 'user']);
-  const forB = labMessages(transcriptOf(1), 'b');
+  assert.match(forA[0].content, /Ты заговариваешь первым/);
+  const forB = labMessages(transcriptOf(1), 'b', 'не для B');
   assert.deepEqual(forB, [{ role: 'user', content: 'реплика 0' }]);
 });
 
-test('labSystem includes character, scenario, opponent and hidden motive', () => {
-  const s = labSystem('psychopath', 'borderline', 'romance');
-  assert.match(s, /Марк/);
-  assert.match(s, /Лера/);
-  assert.match(s, /съехаться/);
-  assert.ok(s.includes(MOTIVES.psychopath));
-  assert.doesNotMatch(s, /совместный проект\.$/m);
+test('every scenario has described intros with an opening cue for A', () => {
+  for (const id of SCENARIO_IDS) {
+    assert.ok(SCENARIOS[id].intros.length >= 2, id);
+    for (const { text, cue } of SCENARIOS[id].intros) assert.ok(text.length > 40 && /^Ты заговариваешь первым/.test(cue), id);
+  }
+});
+
+test('labSystem gives the intro, opponent bio and motive; only A gets the opening cue; no trainer project', () => {
+  const intro = SCENARIOS.romance.intros[0];
+  const forA = labSystem('psychopath', 'borderline', 'romance', 0, 'a');
+  const forB = labSystem('borderline', 'psychopath', 'romance', 0, 'b');
+  assert.ok(forA.includes(intro.text) && forB.includes(intro.text));
+  assert.ok(forA.includes(intro.cue));
+  assert.ok(!forB.includes(intro.cue));
+  assert.match(forB, /Первым заговорит Марк/);
+  assert.ok(forA.includes(PERSONAS.borderline.bio));
+  assert.ok(forA.includes(MOTIVES.psychopath));
+  for (const id of ARCHETYPE_IDS) {
+    const s = labSystem(id, id === 'secure' ? 'hsp' : 'secure', 'first-meeting', 1, 'a');
+    assert.doesNotMatch(s, /проект/i, id);
+  }
 });
 
 test('verdictPrompt neutralises transcript delimiters', () => {

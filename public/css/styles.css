@@ -314,3 +314,8 @@ h3 { font: 500 20px/1.3 var(--sans); color: var(--ink); margin: 6px 0 8px; }
   .media-slot { width: 64px; }
   .lab-line { max-width: 100%; }
 }
+
+.intro { margin: 12px 0 16px; }
+.intro-head { justify-content: space-between; }
+.intro-head .back { margin: 0; }
+.intro-text { font: 400 19px/1.45 var(--serif); color: var(--ink); margin: 8px 0; }

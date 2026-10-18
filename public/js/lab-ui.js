@@ -7,8 +7,15 @@ import { h, mount, store, api, media } from './ui.js';
 const HISTORY_KEY = 'lab-history';
 const HISTORY_LIMIT = 200;
 
-/** @type {{a: string|null, b: string|null, scenario: string, run: any}} */
-let state = { a: null, b: null, scenario: SCENARIO_IDS[0], run: null };
+/** Random intro index for a scenario, different from `current` when there is a choice. */
+function randomIntro(scenarioId, current = -1) {
+  const n = SCENARIOS[scenarioId].intros.length;
+  const options = [...Array(n).keys()].filter((i) => i !== current);
+  return options[Math.floor(Math.random() * options.length)] ?? 0;
+}
+
+/** @type {{a: string|null, b: string|null, scenario: string, intro: number, run: any}} */
+let state = { a: null, b: null, scenario: SCENARIO_IDS[0], intro: randomIntro(SCENARIO_IDS[0]), run: null };
 let runToken = 0;
 
 const isArchetype = (id) => typeof id === 'string' && Object.hasOwn(ARCHETYPES, id);
@@ -53,7 +60,7 @@ function swap() {
 /* ---------- running ---------- */
 
 async function runExperiment(resume = false) {
-  const { a, b, scenario } = state;
+  const { a, b, scenario, intro } = state;
   if (!a || !b || a === b) return;
   const token = (runToken += 1);
   stickToBottom = true;
@@ -63,13 +70,13 @@ async function runExperiment(resume = false) {
   try {
     let lines = transcript;
     while (lines.length < LAB_TURNS) {
-      const { speaker, text } = await api('/lab/turn', { a, b, scenario, transcript: lines });
+      const { speaker, text } = await api('/lab/turn', { a, b, scenario, intro, transcript: lines });
       if (token !== runToken) return; // a newer run (or a stop) superseded this one
       lines = [...lines, { speaker, text }];
       setState({ run: { ...state.run, transcript: lines } });
     }
     setState({ run: { ...state.run, status: 'judging' } });
-    const verdict = await api('/lab/verdict', { a, b, scenario, transcript: lines });
+    const verdict = await api('/lab/verdict', { a, b, scenario, intro, transcript: lines });
     if (token !== runToken) return;
     saveResult({ a, b, scenario, verdict });
     setState({ run: { ...state.run, status: 'done', verdict } });
@@ -94,6 +101,26 @@ function saveResult({ a, b, scenario, verdict }) {
 }
 
 /* ---------- view ---------- */
+
+function introView() {
+  const { scenario, intro, a } = state;
+  const { setting, intros } = SCENARIOS[scenario];
+  const opener = a ? firstName(a) : 'Игрок A';
+  return h('div', { class: 'card intro' }, [
+    h('div', { class: 'row intro-head' }, [
+      h('span', { class: 'eyebrow', text: 'Вступление' }),
+      h('button', {
+        class: 'back',
+        text: '🎲 Другое вступление',
+        attrs: isRunning() ? { disabled: '' } : {},
+        on: { click: () => setState({ intro: randomIntro(scenario, intro), run: null }) },
+      }),
+    ]),
+    h('p', { class: 'intro-text', text: intros[intro].text }),
+    h('p', { class: 'muted small', text: `${setting} Первым заговаривает ${opener}.` }),
+  ]);
+}
+
 
 function slotView(slot) {
   const id = state[slot];
@@ -143,7 +170,7 @@ function scenarioView() {
     class: `chip ${state.scenario === sid ? 'is-active' : ''}`,
     text: `${SCENARIOS[sid].emoji} ${SCENARIOS[sid].title}`,
     attrs: isRunning() ? { disabled: '' } : {},
-    on: { click: () => setState({ scenario: sid, run: null }) },
+    on: { click: () => setState({ scenario: sid, intro: randomIntro(sid), run: null }) },
   })));
 }
 
@@ -271,7 +298,7 @@ function render() {
     rosterView(),
     h('h3', { text: 'Стадия отношений' }),
     scenarioView(),
-    h('p', { class: 'muted small', text: SCENARIOS[state.scenario].setting }),
+    introView(),
     h('div', { class: 'row' }, [
       h('button', {
         class: 'btn btn-primary',

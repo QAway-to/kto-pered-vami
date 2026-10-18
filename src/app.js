@@ -9,6 +9,7 @@ import {
   validateLabRequest, nextSpeaker, labSystem, labMessages, verdictPrompt, parseVerdict, MAX_LINE_CHARS,
 } from './lab.js';
 import { ARCHETYPES, ARCHETYPE_IDS } from '../public/js/archetypes.js';
+import { SCENARIOS } from '../public/js/lab-data.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(here, '..', 'public');
@@ -188,13 +189,13 @@ ${formatTranscript(parsed.value, persona.name)}
   api.post('/lab/turn', labLimit, aiBudget, async (req, res, next) => {
     const parsed = validateLabRequest(req.body);
     if (!parsed.ok) return res.status(400).json(fail(parsed.error));
-    const { a, b, scenario, transcript } = parsed.value;
+    const { a, b, scenario, intro, transcript } = parsed.value;
     const speaker = nextSpeaker(transcript);
     const [self, other] = speaker === 'a' ? [a, b] : [b, a];
     try {
       const line = await llm.complete({
-        system: labSystem(self, other, scenario),
-        messages: labMessages(transcript, speaker),
+        system: labSystem(self, other, scenario, intro, speaker),
+        messages: labMessages(transcript, speaker, SCENARIOS[scenario].intros[intro].cue),
         mode: 'chat',
         maxTokens: 600,
       });
