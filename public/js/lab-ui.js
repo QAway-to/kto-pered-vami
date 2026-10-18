@@ -6,10 +6,62 @@ import { h, mount, store, api, media, sceneChips, introCard } from './ui.js';
 
 const HISTORY_KEY = 'lab-history';
 const HISTORY_LIMIT = 200;
+const SPEED_KEY = 'lab-speed';
 
-/** @type {{a: string|null, b: string|null, scenario: string, intro: number, run: any}} */
-let state = { a: null, b: null, scenario: SCENARIO_IDS[0], intro: randomIntro(SCENARIO_IDS[0]), run: null };
+const SPEED_CONFIG = {
+  slow: { label: '🐢 Медленно', readBase: 2800, readPerChar: 16, typeDelay: 1800, judgingDelay: 2400 },
+  normal: { label: '⏱ В темпе', readBase: 1900, readPerChar: 10, typeDelay: 1300, judgingDelay: 1700 },
+  fast: { label: '⚡ Быстро', readBase: 700, readPerChar: 4, typeDelay: 500, judgingDelay: 800 },
+};
+
+function getReadingDelay(text, speed = 'normal') {
+  const cfg = SPEED_CONFIG[speed] ?? SPEED_CONFIG.normal;
+  const chars = typeof text === 'string' ? text.length : 0;
+  return cfg.readBase + Math.min(2200, chars * cfg.readPerChar);
+}
+
+function getTypingDelay(speed = 'normal') {
+  return (SPEED_CONFIG[speed] ?? SPEED_CONFIG.normal).typeDelay;
+}
+
+function getJudgingDelay(speed = 'normal') {
+  return (SPEED_CONFIG[speed] ?? SPEED_CONFIG.normal).judgingDelay;
+}
+
+function sleep(ms, token) {
+  return new Promise((resolve) => {
+    let check;
+    const timer = setTimeout(() => {
+      clearInterval(check);
+      resolve();
+    }, ms);
+    check = setInterval(() => {
+      if (token !== runToken) {
+        clearTimeout(timer);
+        clearInterval(check);
+        resolve();
+      }
+    }, 40);
+  });
+}
+
+/** @type {{a: string|null, b: string|null, scenario: string, intro: number, run: any, speed: 'slow'|'normal'|'fast'}} */
+let state = {
+  a: null,
+  b: null,
+  scenario: SCENARIO_IDS[0],
+  intro: randomIntro(SCENARIO_IDS[0]),
+  run: null,
+  speed: store.get(SPEED_KEY, 'normal') in SPEED_CONFIG ? store.get(SPEED_KEY, 'normal') : 'normal',
+};
 let runToken = 0;
+
+function setSpeed(speed) {
+  if (speed in SPEED_CONFIG) {
+    store.set(SPEED_KEY, speed);
+    setState({ speed });
+  }
+}
 
 const isArchetype = (id) => typeof id === 'string' && Object.hasOwn(ARCHETYPES, id);
 let stickToBottom = true;
@@ -58,24 +110,43 @@ async function runExperiment(resume = false) {
   const token = (runToken += 1);
   stickToBottom = true;
   const transcript = resume && state.run ? state.run.transcript : [];
-  setState({ run: { transcript, status: 'running', verdict: null, error: null } });
+  setState({ run: { transcript, status: 'running', typing: true, verdict: null, error: null } });
 
   try {
     let lines = transcript;
     while (lines.length < LAB_TURNS) {
-      const { speaker, text } = await api('/lab/turn', { a, b, scenario, intro, transcript: lines });
-      if (token !== runToken) return; // a newer run (or a stop) superseded this one
+      if (lines.length > 0) {
+        setState({ run: { ...state.run, typing: false } });
+        const prev = lines[lines.length - 1];
+        await sleep(getReadingDelay(prev?.text, state.speed), token);
+        if (token !== runToken) return;
+      }
+
+      setState({ run: { ...state.run, typing: true } });
+      const turnPromise = api('/lab/turn', { a, b, scenario, intro, transcript: lines });
+      const typingWait = sleep(getTypingDelay(state.speed), token);
+      const [{ speaker, text }] = await Promise.all([turnPromise, typingWait]);
+      if (token !== runToken) return;
+
       lines = [...lines, { speaker, text }];
-      setState({ run: { ...state.run, transcript: lines } });
+      setState({ run: { ...state.run, transcript: lines, typing: false } });
     }
-    setState({ run: { ...state.run, status: 'judging' } });
-    const verdict = await api('/lab/verdict', { a, b, scenario, intro, transcript: lines });
+
+    const finalLine = lines[lines.length - 1];
+    await sleep(getReadingDelay(finalLine?.text, state.speed), token);
     if (token !== runToken) return;
+
+    setState({ run: { ...state.run, status: 'judging', typing: true } });
+    const verdictPromise = api('/lab/verdict', { a, b, scenario, intro, transcript: lines });
+    const judgingWait = sleep(getJudgingDelay(state.speed), token);
+    const [verdict] = await Promise.all([verdictPromise, judgingWait]);
+    if (token !== runToken) return;
+
     saveResult({ a, b, scenario, verdict });
-    setState({ run: { ...state.run, status: 'done', verdict } });
+    setState({ run: { ...state.run, status: 'done', typing: false, verdict } });
   } catch (err) {
     if (token !== runToken) return;
-    setState({ run: { ...state.run, status: 'error', error: err.message } });
+    setState({ run: { ...state.run, status: 'error', typing: false, error: err.message } });
   }
 }
 
@@ -166,7 +237,7 @@ function chatView() {
       h('div', { class: 'msg' }, [h('strong', { text: firstName(id) }), h('span', { text: l.text })]),
     ]);
   }));
-  if (run.status === 'running') {
+  if (run.status === 'running' && run.typing) {
     const next = run.transcript.length % 2 === 0 ? a : b;
     chat.append(h('div', { class: 'msg msg-typing', text: `${firstName(next)} печатает…` }));
   }
@@ -218,6 +289,18 @@ function verdictView(v) {
   ]);
 }
 
+function speedPickerView() {
+  return h('div', { class: 'speed-picker', attrs: { role: 'group', 'aria-label': 'Скорость воспроизведения' } }, [
+    h('span', { class: 'small muted', text: 'Скорость:' }),
+    ...Object.entries(SPEED_CONFIG).map(([key, cfg]) => h('button', {
+      class: `speed-btn ${state.speed === key ? 'is-active' : ''}`,
+      text: cfg.label,
+      attrs: { type: 'button', title: `Скорость: ${cfg.label}` },
+      on: { click: () => setSpeed(key) },
+    })),
+  ]);
+}
+
 function runView() {
   const { run } = state;
   if (!run) return null;
@@ -225,7 +308,10 @@ function runView() {
   return h('div', { class: 'lab-run' }, [
     h('div', { class: 'row lab-run-head' }, [
       h('span', { class: 'eyebrow', text: run.status === 'done' ? 'Эксперимент завершён' : progress }),
-      isRunning() && h('button', { class: 'btn btn-ghost', text: 'Остановить', on: { click: stop } }),
+      h('div', { class: 'row lab-run-actions' }, [
+        speedPickerView(),
+        isRunning() && h('button', { class: 'btn btn-ghost', text: 'Остановить', on: { click: stop } }),
+      ].filter(Boolean)),
     ]),
     chatView(),
     run.status === 'error' && h('div', { class: 'row' }, [
@@ -290,7 +376,8 @@ function render() {
         on: { click: () => runExperiment() },
       }),
       h('button', { class: 'btn btn-ghost', text: '⇄ Поменять местами', attrs: !ready || isRunning() ? { disabled: '' } : {}, on: { click: swap } }),
-    ]),
+      !state.run && speedPickerView(),
+    ].filter(Boolean)),
     runView(),
     h('h2', { text: 'Матрица «кто кого»' }),
     matrixView(),

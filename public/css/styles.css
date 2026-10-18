@@ -152,7 +152,8 @@ h3 { font: 500 20px/1.3 var(--sans); color: var(--ink); margin: 6px 0 8px; }
 .msg { max-width: 82%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; word-wrap: break-word; }
 .msg-them { align-self: flex-start; background: var(--surface-card); color: var(--ink); border-bottom-left-radius: 4px; }
 .msg-me { align-self: flex-end; background: var(--primary); color: var(--on-primary); border-bottom-right-radius: 4px; }
-.msg-typing { color: var(--muted); font-style: italic; }
+.msg-typing { color: var(--muted); font-style: italic; animation: labPulse 1.4s ease-in-out infinite; }
+@keyframes labPulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 .composer { display: flex; gap: 8px; margin-top: 12px; }
 .composer textarea {
   flex: 1; resize: none; min-height: 48px; max-height: 140px; padding: 12px 14px;
@@ -277,9 +278,22 @@ h3 { font: 500 20px/1.3 var(--sans); color: var(--ink); margin: 6px 0 8px; }
 .roster-item:disabled { opacity: .35; cursor: not-allowed; }
 .chip.is-active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, var(--surface-soft)); color: var(--ink); }
 .lab-run { margin-top: 24px; }
-.lab-run-head { justify-content: space-between; margin-bottom: 8px; }
+.lab-run-head { justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.lab-run-actions { gap: 8px; align-items: center; }
+.speed-picker { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.speed-btn {
+  padding: 3px 8px; border-radius: 999px; border: 1px solid var(--hairline);
+  background: var(--surface-card); color: var(--muted); font-size: 11px; font-weight: 500; cursor: pointer;
+  transition: all .15s ease;
+}
+.speed-btn:hover { border-color: var(--primary); color: var(--ink); }
+.speed-btn.is-active { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
 .lab-chat { max-height: 60vh; }
-.lab-line { display: flex; gap: 8px; align-items: flex-end; max-width: 88%; }
+.lab-line { display: flex; gap: 8px; align-items: flex-end; max-width: 88%; animation: labFadeIn .22s ease-out both; }
+@keyframes labFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .lab-line .msg { display: flex; flex-direction: column; gap: 2px; max-width: 100%; }
 .lab-line .msg strong { font-size: 12px; opacity: .75; }
 .lab-a { align-self: flex-start; }
