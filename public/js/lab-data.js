@@ -73,6 +73,19 @@ export const SCENARIOS = {
 
 export const SCENARIO_IDS = Object.freeze(Object.keys(SCENARIOS));
 
+/** Dominant in Uchtomsky's sense: the core fixation / frame of the archetype in dialogue. */
+export const DOMINANTS = {
+  'dark-empath': { name: 'Контроль через уязвимость', focus: 'Поиск болевых точек и эмоциональный крючок' },
+  'grandiose-narcissist': { name: 'Подтверждение превосходства', focus: 'Удержание статуса и принуждение к восхищению' },
+  'vulnerable-narcissist': { name: 'Роль непризнанного гения', focus: 'Пассивная обида и требование сочувствия' },
+  machiavellian: { name: 'Холодная выгода', focus: 'Сбор компромата и скрытая триангуляция' },
+  psychopath: { name: 'Импульсивный драйв', focus: 'Снятие тормозов и игра на чужих нервах' },
+  borderline: { name: 'Паника отвержения', focus: 'Требование гарантий близости или эмоциональный взрыв' },
+  avoidant: { name: 'Автономия и дистанция', focus: 'Откат назад и эмоциональная броня' },
+  hsp: { name: 'Сенсорная безопасность', focus: 'Защита от перегрузки и поиск искренности' },
+  secure: { name: 'Взаимность и границы', focus: 'Устойчивость, прямота и равный диалог' },
+};
+
 /** What each archetype is really after — its payoff in the game. */
 export const MOTIVES = {
   'dark-empath': 'получить влияние: узнать слабые места собеседника и сделать так, чтобы он чувствовал себя тебе обязанным',

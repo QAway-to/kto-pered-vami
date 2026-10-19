@@ -57,13 +57,31 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .mark { color: var(--primary); font-size: 20px; }
-.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-.tab {
-  border: 0; background: transparent; padding: 8px 12px; border-radius: var(--r-full);
-  color: var(--muted); font-size: 14px; font-weight: 500; white-space: nowrap;
+.tabs {
+  display: flex; gap: 4px; align-items: center; overflow-x: auto; scrollbar-width: none;
+  background: var(--surface-soft); padding: 4px; border-radius: var(--r-full);
+  border: 1px solid var(--hairline);
 }
-.tab:hover { color: var(--ink); }
-.tab.is-active { background: var(--surface-card); color: var(--ink); }
+.tab {
+  border: 0; background: transparent; padding: 7px 13px; border-radius: var(--r-full);
+  color: var(--muted); font-size: 13px; font-weight: 500; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  transition: all .18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.tab:hover { color: var(--ink); background: color-mix(in srgb, var(--canvas) 65%, transparent); }
+.tab.is-active {
+  background: var(--surface-card); color: var(--ink);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .07); font-weight: 600;
+}
+.tab-icon {
+  width: 15px; height: 15px; stroke-width: 2; flex-shrink: 0;
+  transition: transform .18s ease, stroke .18s ease; opacity: .75;
+}
+.tab:hover .tab-icon { opacity: 1; }
+.tab.is-active .tab-icon {
+  stroke: var(--primary); opacity: 1; transform: scale(1.1);
+}
+.tab-label { line-height: 1; }
 
 main { max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }
 .view { display: none; }
@@ -169,8 +187,11 @@ h3 { font: 500 20px/1.3 var(--sans); color: var(--ink); margin: 6px 0 8px; }
 .foot { max-width: 960px; margin: 0 auto; padding: 24px 16px 40px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--hairline); }
 
 @media (max-width: 560px) {
-  .top { flex-direction: column; align-items: stretch; gap: 8px; }
-  .tabs { justify-content: space-between; }
+  .top { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; }
+  .tabs { justify-content: space-between; gap: 2px; padding: 3px; }
+  .tab { flex: 1; justify-content: center; padding: 5px 2px; font-size: 11px; gap: 3px; flex-direction: column; }
+  .tab-icon { width: 15px; height: 15px; }
+  .tab-label { font-size: 10.5px; }
   .bar { grid-template-columns: 96px 1fr 40px; }
   main { padding-top: 20px; }
   .result-hero { padding: 24px; }
@@ -324,13 +345,44 @@ h3 { font: 500 20px/1.3 var(--sans); color: var(--ink); margin: 6px 0 8px; }
 .cell-draw { background: var(--surface-card); }
 .cell-self { background: var(--hairline); }
 
+.slot-dominant {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 500; color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-soft));
+  padding: 3px 8px; border-radius: var(--r-full); margin-top: 4px;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.slot-dominant span { font-weight: 600; }
+
+.frame-control {
+  background: var(--surface-card); border: 1px solid var(--hairline);
+  border-radius: var(--r-md); padding: 10px 14px; margin-bottom: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.frame-control-head {
+  display: flex; justify-content: space-between; align-items: center; font-size: 12px;
+}
+.frame-control-title { font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 5px; }
+.frame-control-status { color: var(--muted); font-size: 11px; }
+.frame-track {
+  height: 8px; border-radius: 4px; background: var(--surface-soft);
+  display: flex; overflow: hidden; border: 1px solid var(--hairline);
+}
+.frame-side-a {
+  height: 100%; transition: width .4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.frame-side-b {
+  height: 100%; transition: width .4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.frame-labels {
+  display: flex; justify-content: space-between; font-size: 11px; font-weight: 500;
+}
+
 @media (max-width: 560px) {
   .arena { grid-template-columns: 1fr; }
   .vs { justify-self: center; }
   .roster { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .media-icon { width: 52px; }
-  .tabs { gap: 0; }
-  .tab { padding: 6px 5px; font-size: 13px; }
   .media-slot { width: 64px; }
   .lab-line { max-width: 100%; }
 }

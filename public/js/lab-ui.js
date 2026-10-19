@@ -1,7 +1,7 @@
 // Lab UI: drag two archetypes into the arena, watch them talk, get a game-theory verdict, build a "who beats whom" matrix.
 
 import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
-import { LAB_TURNS, SCENARIO_IDS, MOTIVES, OUTCOMES, PERSONA_NAMES, randomIntro } from './lab-data.js';
+import { LAB_TURNS, SCENARIO_IDS, MOTIVES, OUTCOMES, PERSONA_NAMES, DOMINANTS, randomIntro } from './lab-data.js';
 import { h, mount, store, api, media, sceneChips, introCard } from './ui.js';
 
 const HISTORY_KEY = 'lab-history';
@@ -231,6 +231,10 @@ function slotView(slot) {
       h('div', { class: 'slot-body' }, [
         h('span', { class: 'eyebrow', text: label }),
         h('h3', { text: `${firstName(id)} · ${ARCHETYPES[id].name}` }),
+        DOMINANTS[id] && h('div', { class: 'slot-dominant', attrs: { title: DOMINANTS[id].focus } }, [
+          h('span', { text: '🎯 Доминанта:' }),
+          h('span', { text: DOMINANTS[id].name }),
+        ]),
         h('p', { class: 'slot-motive', text: `Хочет: ${MOTIVES[id]}` }),
         !isRunning() && h('button', { class: 'back', text: 'Убрать', on: { click: () => setState({ [slot]: null, run: null }) } }),
       ]),
@@ -339,6 +343,53 @@ function speedPickerView() {
   ]);
 }
 
+function frameControlView() {
+  const { run, a, b } = state;
+  if (!run || (!run.transcript.length && !run.verdict)) return null;
+
+  let pctA = 50;
+  let statusText = 'Равное противостояние';
+
+  if (run.verdict) {
+    const total = (run.verdict.scoreA + run.verdict.scoreB) || 1;
+    pctA = Math.round((run.verdict.scoreA / total) * 100);
+    if (run.verdict.winner === 'a') statusText = `Доминанта ${firstName(a)} победила (${run.verdict.scoreA}:${run.verdict.scoreB})`;
+    else if (run.verdict.winner === 'b') statusText = `Доминанта ${firstName(b)} победила (${run.verdict.scoreB}:${run.verdict.scoreA})`;
+    else statusText = 'Ничья: баланс доминант удержан';
+  } else {
+    const countA = run.transcript.filter((l) => l.speaker === 'a').length;
+    const countB = run.transcript.filter((l) => l.speaker === 'b').length;
+    const charsA = run.transcript.filter((l) => l.speaker === 'a').reduce((acc, l) => acc + l.text.length, 0);
+    const charsB = run.transcript.filter((l) => l.speaker === 'b').reduce((acc, l) => acc + l.text.length, 0);
+    const weightA = countA * 25 + charsA * 0.15;
+    const weightB = countB * 25 + charsB * 0.15;
+    const total = (weightA + weightB) || 1;
+    pctA = Math.max(25, Math.min(75, Math.round((weightA / total) * 100)));
+    if (pctA > 54) statusText = `Фрейм удерживает: ${firstName(a)}`;
+    else if (pctA < 46) statusText = `Инициативу перехватил: ${firstName(b)}`;
+    else statusText = 'Равное противостояние доминант';
+  }
+
+  const pctB = 100 - pctA;
+  const colorA = ARCHETYPES[a]?.color ?? 'var(--primary)';
+  const colorB = ARCHETYPES[b]?.color ?? '#5db8a6';
+
+  return h('div', { class: 'frame-control' }, [
+    h('div', { class: 'frame-control-head' }, [
+      h('span', { class: 'frame-control-title', text: '⚖️ Борьба доминант (Frame Control)' }),
+      h('span', { class: 'frame-control-status', text: statusText }),
+    ]),
+    h('div', { class: 'frame-track' }, [
+      h('div', { class: 'frame-side-a', vars: { width: `${pctA}%`, background: colorA } }),
+      h('div', { class: 'frame-side-b', vars: { width: `${pctB}%`, background: colorB } }),
+    ]),
+    h('div', { class: 'frame-labels' }, [
+      h('span', { vars: { color: colorA }, text: `${firstName(a)}: ${pctA}%` }),
+      h('span', { vars: { color: colorB }, text: `${firstName(b)}: ${pctB}%` }),
+    ]),
+  ]);
+}
+
 function runView() {
   const { run } = state;
   if (!run) return null;
@@ -351,6 +402,7 @@ function runView() {
         isRunning() && h('button', { class: 'btn btn-ghost', text: 'Остановить', on: { click: stop } }),
       ].filter(Boolean)),
     ]),
+    frameControlView(),
     chatView(),
     run.status === 'error' && h('div', { class: 'row' }, [
       h('p', { class: 'error', text: run.error }),
