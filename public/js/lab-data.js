@@ -12,7 +12,6 @@ export const SCENARIOS = {
   'first-meeting': {
     title: 'Только познакомились',
     stage: 'Знакомство',
-    emoji: '👋',
     setting: 'Вы двое видите друг друга впервые и почти ничего друг о друге не знаете. К концу разговора станет понятно, захотите ли вы общаться дальше.',
     intros: [
       {
@@ -32,7 +31,6 @@ export const SCENARIOS = {
   romance: {
     title: 'Завязался роман',
     stage: 'Первые месяцы',
-    emoji: '💞',
     setting: 'Вы встречаетесь около двух месяцев, всё развивается быстро. Самое время понять, куда движутся отношения.',
     intros: [
       {
@@ -52,7 +50,6 @@ export const SCENARIOS = {
   'long-term': {
     title: 'Вместе три года',
     stage: 'Долгие отношения',
-    emoji: '🏠',
     setting: 'Вы вместе три года и живёте вдвоём. Накопилась усталость, и привычные договорённости начали трещать.',
     intros: [
       {
@@ -101,10 +98,10 @@ export const MOTIVES = {
 
 /** How the relationship ended, as judged by the analyst. */
 export const OUTCOMES = {
-  healthy: { label: 'Здоровая связь', emoji: '🌱' },
-  continue: { label: 'Общение продолжится', emoji: '🤝' },
-  toxic: { label: 'Токсичная связь', emoji: '☣️' },
-  breakup: { label: 'Разошлись', emoji: '💔' },
+  healthy: { label: 'Здоровая связь', tone: 'success' },
+  continue: { label: 'Общение продолжится', tone: 'info' },
+  toxic: { label: 'Токсичная связь', tone: 'danger' },
+  breakup: { label: 'Разошлись', tone: 'warning' },
 };
 
 export const OUTCOME_IDS = Object.freeze(Object.keys(OUTCOMES));

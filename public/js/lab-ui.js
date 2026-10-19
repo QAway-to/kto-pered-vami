@@ -9,9 +9,9 @@ const HISTORY_LIMIT = 200;
 const SPEED_KEY = 'lab-speed';
 
 const SPEED_CONFIG = {
-  slow: { label: '🐢 Медленно', readBase: 2000, readPerChar: 10, typeDelay: 1100, judgingDelay: 2000, charMs: 32, pauseEnd: 180, pauseMid: 90 },
-  normal: { label: '⏱ В темпе', readBase: 1300, readPerChar: 7, typeDelay: 800, judgingDelay: 1500, charMs: 18, pauseEnd: 120, pauseMid: 60 },
-  fast: { label: '⚡ Быстро', readBase: 500, readPerChar: 3, typeDelay: 400, judgingDelay: 700, charMs: 6, pauseEnd: 40, pauseMid: 20 },
+  slow: { label: '0.75×', readBase: 2000, readPerChar: 10, typeDelay: 1100, judgingDelay: 2000, charMs: 32, pauseEnd: 180, pauseMid: 90 },
+  normal: { label: '1.0×', readBase: 1300, readPerChar: 7, typeDelay: 800, judgingDelay: 1500, charMs: 18, pauseEnd: 120, pauseMid: 60 },
+  fast: { label: '1.5×', readBase: 500, readPerChar: 3, typeDelay: 400, judgingDelay: 700, charMs: 6, pauseEnd: 40, pauseMid: 20 },
 };
 
 function getReadingDelay(text, speed = 'normal') {
@@ -232,8 +232,8 @@ function slotView(slot) {
         h('span', { class: 'eyebrow', text: label }),
         h('h3', { text: `${firstName(id)} · ${ARCHETYPES[id].name}` }),
         DOMINANTS[id] && h('div', { class: 'slot-dominant', attrs: { title: DOMINANTS[id].focus } }, [
-          h('span', { text: '🎯 Доминанта:' }),
-          h('span', { text: DOMINANTS[id].name }),
+          h('span', { class: 'dominant-label', text: 'Доминанта:' }),
+          h('span', { class: 'dominant-val', text: DOMINANTS[id].name }),
         ]),
         h('p', { class: 'slot-motive', text: `Хочет: ${MOTIVES[id]}` }),
         !isRunning() && h('button', { class: 'back', text: 'Убрать', on: { click: () => setState({ [slot]: null, run: null }) } }),
@@ -314,8 +314,8 @@ function verdictView(v) {
   const winnerText = v.winner === 'draw' ? 'Ничья' : `Добился своего: ${firstName(v.winner === 'a' ? a : b)}`;
   return h('div', { class: 'card verdict' }, [
     h('div', { class: 'row' }, [
-      h('span', { class: 'pill', text: `${outcome.emoji} ${outcome.label}` }),
-      h('span', { class: 'pill', text: winnerText }),
+      h('span', { class: `pill pill-${outcome.tone || 'neutral'}`, text: outcome.label }),
+      h('span', { class: 'pill pill-accent', text: winnerText }),
     ]),
     h('h2', { text: v.title }),
     scoreRow(a, v.scoreA, v.winner === 'a'),
@@ -376,7 +376,7 @@ function frameControlView() {
 
   return h('div', { class: 'frame-control' }, [
     h('div', { class: 'frame-control-head' }, [
-      h('span', { class: 'frame-control-title', text: '⚖️ Борьба доминант (Frame Control)' }),
+      h('span', { class: 'frame-control-title', text: 'Борьба доминант (Frame Control)' }),
       h('span', { class: 'frame-control-status', text: statusText }),
     ]),
     h('div', { class: 'frame-track' }, [
@@ -465,7 +465,7 @@ function render() {
         attrs: !ready || isRunning() ? { disabled: '' } : {},
         on: { click: () => runExperiment() },
       }),
-      h('button', { class: 'btn btn-ghost', text: '⇄ Поменять местами', attrs: !ready || isRunning() ? { disabled: '' } : {}, on: { click: swap } }),
+      h('button', { class: 'btn btn-ghost', text: 'Поменять местами', attrs: !ready || isRunning() ? { disabled: '' } : {}, on: { click: swap } }),
       !state.run && speedPickerView(),
     ].filter(Boolean)),
     runView(),

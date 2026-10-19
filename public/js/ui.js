@@ -59,27 +59,39 @@ export async function api(path, body) {
   return json.data;
 }
 
-/** Archetype artwork: generated image when available, emoji on a tinted gradient otherwise. */
+/** Archetype artwork: generated image when available, monogram on a tinted gradient otherwise. */
 export function media(id, size = '') {
   const a = ARCHETYPES[id];
   const src = archetypeImage(id);
   return h('div', { class: `media ${size}`, vars: { '--c': a.color } }, [
     src
       ? h('img', { attrs: { src, alt: a.name, loading: 'lazy' } })
-      : h('span', { class: 'media-emoji', text: a.emoji, attrs: { 'aria-hidden': 'true' } }),
+      : h('span', { class: 'media-monogram', text: a.name.charAt(0), attrs: { 'aria-hidden': 'true' } }),
   ]);
 }
 
 export function chip(id) {
   const a = ARCHETYPES[id];
-  return `${a.emoji} ${a.name}`;
+  return a.name;
+}
+
+/** Formats text by highlighting quoted direct speech («...»). */
+export function formatSpeech(text) {
+  if (typeof text !== 'string') return [text];
+  const parts = text.split(/(«[^»]+»)/g);
+  if (parts.length === 1) return [text];
+  return parts.map((part) => (
+    part.startsWith('«') && part.endsWith('»')
+      ? h('span', { class: 'speech-quote', text: part })
+      : part
+  ));
 }
 
 /** Relationship-stage picker. */
 export function sceneChips({ scenario, disabled = false, onPick }) {
   return h('div', { class: 'chips' }, SCENARIO_IDS.map((sid) => h('button', {
     class: `chip ${scenario === sid ? 'is-active' : ''}`,
-    text: `${SCENARIOS[sid].emoji} ${SCENARIOS[sid].title}`,
+    text: SCENARIOS[sid].title,
     attrs: disabled ? { disabled: '' } : {},
     on: { click: () => onPick(sid) },
   })));
@@ -91,7 +103,7 @@ export function introCard({ scenario, intro, opener, disabled = false, onReroll 
   return h('div', { class: 'card intro' }, [
     h('div', { class: 'row intro-head' }, [
       h('span', { class: 'eyebrow', text: 'Вступление' }),
-      h('button', { class: 'back', text: '🎲 Другое вступление', attrs: disabled ? { disabled: '' } : {}, on: { click: onReroll } }),
+      h('button', { class: 'back', text: 'Другой сценарий', attrs: disabled ? { disabled: '' } : {}, on: { click: onReroll } }),
     ]),
     h('p', { class: 'intro-text', text: intros[intro].text }),
     h('p', { class: 'muted small', text: `${setting} Первым заговаривает ${opener}.` }),

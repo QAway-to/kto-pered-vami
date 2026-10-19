@@ -15,7 +15,7 @@ test('there are at least 10 archetypes, each fully described with sources', () =
   assert.ok(ARCHETYPE_IDS.length >= 8);
   for (const id of ARCHETYPE_IDS) {
     const a = ARCHETYPES[id];
-    for (const field of ['name', 'aka', 'tagline', 'emoji', 'color', 'construct', 'science', 'howTo']) {
+    for (const field of ['name', 'aka', 'tagline', 'color', 'construct', 'science', 'howTo']) {
       assert.ok(typeof a[field] === 'string' && a[field].length > 0, `${id}.${field}`);
     }
     assert.ok(a.signs.length >= 3 && a.flags.length >= 3 && a.refs.length >= 1, id);

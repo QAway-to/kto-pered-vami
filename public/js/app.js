@@ -1,7 +1,7 @@
 import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
 import { QUESTIONS, LIKERT, DIMENSIONS, DIM_KEYS, scoreDimensions, rankArchetypes } from './quiz.js';
 import { CASES } from './cases.js';
-import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard } from './ui.js';
+import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech } from './ui.js';
 import { SCENARIO_IDS, SCENARIOS, randomIntro } from './lab-data.js';
 import { renderLab } from './lab-ui.js';
 
@@ -195,8 +195,11 @@ function renderCases() {
     store.set('cases', { right: score.right + (isRight ? 1 : 0), total: score.total + 1 });
     explain.replaceChildren(h('div', { class: 'explain' }, [
       h('h3', { text: isRight ? 'Верно!' : `Это ${chip(c.answer)}` }),
-      h('p', { text: c.why }),
-      h('p', { class: 'muted', text: `Как общаться: ${ARCHETYPES[c.answer].howTo}` }),
+      h('p', { class: 'explain-why' }, formatSpeech(c.why)),
+      h('p', { class: 'muted' }, [
+        h('strong', { class: 'term-label', text: 'Как общаться: ' }),
+        document.createTextNode(ARCHETYPES[c.answer].howTo),
+      ]),
       h('div', { class: 'row' }, [
         h('button', { class: 'btn btn-primary', text: 'Следующий кейс', on: { click: () => { caseQueue = caseQueue.slice(1); renderCases(); } } }),
         h('button', { class: 'btn btn-ghost', text: 'Об архетипе', on: { click: () => go('type', c.answer) } }),
@@ -207,7 +210,7 @@ function renderCases() {
   mount(
     'cases-body',
     h('span', { class: 'eyebrow', text: `Кто перед вами? · счёт ${score.right}/${score.total}` }),
-    h('p', { class: 'question', text: c.text }),
+    h('p', { class: 'question' }, formatSpeech(c.text)),
     h('div', { class: 'options' }, buttons),
     explain,
   );
@@ -326,7 +329,7 @@ function renderDialog(personaId) {
         h('p', { class: 'muted', text: persona.bio }),
       ]),
     ]),
-    h('p', { class: 'scene-line', text: `${SCENARIOS[dialog.scenario].emoji} ${SCENARIOS[dialog.scenario].intros[dialog.intro].text}` }),
+    h('p', { class: 'scene-line', text: SCENARIOS[dialog.scenario].intros[dialog.intro].text }),
     chat,
     h('div', { class: 'composer' }, [input, send]),
     dialog.error && h('p', { class: 'error', text: dialog.error }),

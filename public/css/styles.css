@@ -126,6 +126,31 @@ h3 { font: 600 17px/1.35 var(--sans); color: var(--ink); margin: 4px 0 8px; text
   padding: 6px 12px; border-radius: var(--r-full);
   background: var(--surface-soft); border: 1px solid var(--hairline); font-size: 14px;
 }
+.pill-success {
+  background: color-mix(in srgb, var(--success) 12%, var(--surface-soft));
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  color: var(--ink); font-weight: 600;
+}
+.pill-warning {
+  background: color-mix(in srgb, #d4a017 14%, var(--surface-soft));
+  border-color: color-mix(in srgb, #d4a017 35%, transparent);
+  color: var(--ink); font-weight: 600;
+}
+.pill-danger {
+  background: color-mix(in srgb, var(--error) 12%, var(--surface-soft));
+  border-color: color-mix(in srgb, var(--error) 35%, transparent);
+  color: var(--ink); font-weight: 600;
+}
+.pill-info {
+  background: color-mix(in srgb, #4a6a8a 12%, var(--surface-soft));
+  border-color: color-mix(in srgb, #4a6a8a 35%, transparent);
+  color: var(--ink); font-weight: 600;
+}
+.pill-accent {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-soft));
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+  color: var(--primary); font-weight: 600;
+}
 
 .types { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
 .type-card { border-left: 4px solid var(--c); padding: 20px; }
@@ -162,6 +187,15 @@ h3 { font: 600 17px/1.35 var(--sans); color: var(--ink); margin: 4px 0 8px; text
 .option.is-wrong { border-color: var(--error); background: color-mix(in srgb, var(--error) 12%, var(--surface-soft)); }
 .option:disabled { cursor: default; }
 .explain { margin-top: 16px; padding: 16px 18px; border-radius: var(--r-md); background: var(--surface-card); }
+.explain-why { font-size: 15px; line-height: 1.55; color: var(--ink); margin-bottom: 8px; }
+.speech-quote {
+  font-style: italic; color: var(--ink);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  padding: 1px 6px; border-radius: 4px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.term-label { color: var(--ink); font-weight: 600; }
 
 .bars { display: grid; gap: 10px; margin: 20px 0; }
 .bar { display: grid; grid-template-columns: 120px 1fr 44px; align-items: center; gap: 12px; font-size: 14px; }
@@ -242,10 +276,19 @@ h3 { font: 600 17px/1.35 var(--sans); color: var(--ink); margin: 4px 0 8px; text
 }
 .media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .media-emoji { font-size: 64px; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, .35)); }
+.media-monogram {
+  font: 500 32px/1 var(--serif); color: var(--on-dark);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
 .media-lg { max-width: 280px; border-radius: var(--r-xl); }
 .media-lg .media-emoji { font-size: 96px; }
+.media-lg .media-monogram { font-size: 56px; }
 .media-sm { width: 48px; aspect-ratio: 1; border-radius: 50%; flex: none; }
 .media-sm .media-emoji { font-size: 24px; }
+.media-sm .media-monogram { font-size: 18px; }
+.media-slot .media-monogram { font-size: 28px; }
+.media-icon .media-monogram { font-size: 22px; }
+.media-xs .media-monogram { font-size: 12px; }
 
 .type-hero, .result-hero { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 28px; align-items: center; margin-bottom: 24px; }
 .result-hero { background: var(--surface-dark); color: var(--on-dark-soft); border-radius: var(--r-xl); padding: 24px; }
@@ -369,13 +412,17 @@ h3 { font: 600 17px/1.35 var(--sans); color: var(--ink); margin: 4px 0 8px; text
 .cell-self { background: var(--hairline); }
 
 .slot-dominant {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 12px; font-weight: 500; color: var(--primary);
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px;
   background: color-mix(in srgb, var(--primary) 10%, var(--surface-soft));
-  padding: 3px 8px; border-radius: var(--r-full); margin-top: 4px;
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  padding: 3px 9px; border-radius: var(--r-full); margin-top: 4px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
 }
-.slot-dominant span { font-weight: 600; }
+.dominant-label {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); font-weight: 600;
+}
+.dominant-val { color: var(--primary); font-weight: 600; }
 
 .frame-control {
   background: var(--surface-card); border: 1px solid var(--hairline);
