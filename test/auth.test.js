@@ -349,3 +349,22 @@ test('/chatid in a group replies with the chat ID', async () => {
   assert.equal(reply[1], -1009876543210);
   assert.match(reply[2], /-1009876543210/);
 });
+
+test('without a chat ID the bot still answers /chatid and everyone gets trial access only', async () => {
+  const bot = fakeBot();
+  const app = createApp({
+    llm: fakeLlm(),
+    rateLimit: { windowMs: 60_000, max: 1000 },
+    auth: { mode: 'telegram', bot, botToken: BOT_TOKEN, botUsername: 'kto_bot', chatId: null, channelUrl: null, sessionSecret: SECRET, publicUrl: null, now: () => NOW },
+  });
+  await request(app).post('/api/telegram/webhook').set('X-Telegram-Bot-Api-Secret-Token', deriveWebhookSecret(SECRET))
+    .send({ message: { chat: { id: -1005550001, type: 'supergroup', title: 'Club' }, from: alice, text: '/chatid' } }).expect(200);
+  await new Promise((r) => setImmediate(r));
+  assert.match(bot.calls.find((c) => c[0] === 'sendMessage')[2], /-1005550001/);
+  const auth = `Bearer ${await login(app)}`;
+  const me = await request(app).get('/api/me').set('Authorization', auth).expect(200);
+  assert.equal(me.body.data.subscriber, false);
+  assert.ok(!bot.calls.some((c) => c[0] === 'getChatMember'), 'no membership lookups without a chat');
+  await request(app).post('/api/chat').set('Authorization', auth).send(opening()).expect(200);
+  await request(app).post('/api/chat').set('Authorization', auth).send(opening('hsp')).expect(402);
+});

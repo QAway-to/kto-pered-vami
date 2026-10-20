@@ -36,7 +36,10 @@ export function createAuth(config) {
     now,
     signer: createSigner(config.sessionSecret),
     logins: createLoginStore({ now }),
-    membership: createMembership({ bot: config.bot, chatId: config.chatId, now }),
+    // No chat configured yet: nobody is a subscriber, so only the free tries work.
+    membership: config.chatId
+      ? createMembership({ bot: config.bot, chatId: config.chatId, now })
+      : { isSubscriber: async () => false },
     trials: createTrials(),
     webhookSecret: deriveWebhookSecret(config.sessionSecret),
   };

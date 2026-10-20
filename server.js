@@ -34,12 +34,16 @@ async function authFromEnv(env) {
   const sessionSecret = env.SESSION_SECRET ?? '';
   const missing = [
     !botToken && 'AUTORIZATION_BOT',
-    !chatId && 'TELEGRAM_CHAT_ID',
     sessionSecret.length < 32 && 'SESSION_SECRET (32+ chars)',
   ].filter(Boolean);
   if (missing.length) {
     console.warn(`Auth is not configured (${missing.join(', ')}): AI trainings are closed.`);
     return { mode: 'unavailable', reason: 'not configured' };
+  }
+  // The chat ID is optional at start: the bot must already run to answer /chatid in the club chat.
+  // Without it nobody counts as a subscriber, so only the free tries work.
+  if (!chatId) {
+    console.warn('TELEGRAM_CHAT_ID is not set: subscriptions are not checked, everyone gets trial access only. Send /chatid in the club chat to get the ID.');
   }
 
   const bot = createBotApi({ token: botToken });
@@ -68,7 +72,7 @@ async function authFromEnv(env) {
     bot,
     botToken,
     botUsername,
-    chatId: /^-?\d+$/.test(chatId) ? Number(chatId) : chatId,
+    chatId: !chatId ? null : /^-?\d+$/.test(chatId) ? Number(chatId) : chatId,
     channelUrl: env.TELEGRAM_CHANNEL_URL?.trim() || null,
     sessionSecret,
     publicUrl,
