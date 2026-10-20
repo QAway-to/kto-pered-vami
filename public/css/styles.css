@@ -50,16 +50,20 @@ p { margin: 0 0 10px; text-wrap: pretty; }
 button { font: inherit; color: inherit; cursor: pointer; }
 
 .top {
-  position: sticky; top: 0; z-index: 5;
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  position: sticky; top: 0; z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
   padding: 12px max(16px, calc((100% - 960px) / 2));
   background: color-mix(in srgb, var(--canvas) 92%, transparent);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--hairline);
 }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.brand { justify-self: start; display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .mark { color: var(--primary); font-size: 20px; }
 .tabs {
+  justify-self: center;
   display: flex; gap: 4px; align-items: center; overflow-x: auto; scrollbar-width: none;
   background: var(--surface-soft); padding: 4px; border-radius: var(--r-full);
   border: 1px solid var(--hairline);
@@ -242,8 +246,27 @@ h3 { font: 600 17px/1.35 var(--sans); color: var(--ink); margin: 4px 0 8px; text
 
 .foot { max-width: 960px; margin: 0 auto; padding: 24px 16px 40px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--hairline); }
 
-@media (max-width: 560px) {
-  .top { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; }
+@media (max-width: 680px) {
+  .top {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand account"
+      "tabs tabs";
+    gap: 8px 12px;
+    padding: 8px 12px;
+  }
+  .brand { grid-area: brand; justify-self: start; }
+  .account { grid-area: account; justify-self: end; }
+  .tabs {
+    grid-area: tabs;
+    width: 100%;
+    justify-self: stretch;
+    justify-content: space-between;
+    gap: 2px; padding: 3px;
+  }
+  .home-hero .hero-actions { flex-direction: column; width: 100%; max-width: 280px; gap: 8px; }
+  .home-hero .hero-actions .btn { width: 100%; min-width: 0; }
   .tabs { justify-content: space-between; gap: 2px; padding: 3px; }
   .tab { flex: 1; justify-content: center; padding: 5px 2px; font-size: 11px; gap: 3px; flex-direction: column; }
   .tab-icon { width: 15px; height: 15px; }
@@ -251,6 +274,47 @@ h3 { font: 600 17px/1.35 var(--sans); color: var(--ink); margin: 4px 0 8px; text
   .bar { grid-template-columns: 96px 1fr 40px; }
   main { padding-top: 20px; }
   .result-hero { padding: 24px; }
+}
+
+/* ---------- home hero (centered & aligned) ---------- */
+.home-hero {
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 8px 0 28px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.home-hero .eyebrow {
+  margin-bottom: 8px;
+  letter-spacing: .08em;
+}
+.home-hero .display {
+  margin: 0 0 14px;
+  text-align: center;
+  text-wrap: balance;
+}
+.home-hero .lead {
+  max-width: 640px;
+  margin: 0 auto 18px;
+  text-align: center;
+  text-wrap: pretty;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.home-hero .stats {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  margin: 0 auto 20px;
+}
+.home-hero .hero-actions {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px;
+  margin: 4px auto 8px;
+  width: 100%;
+}
+.home-hero .hero-actions .btn {
+  min-width: 170px;
+  padding: 12px 22px;
+  font-weight: 500;
+  border-radius: var(--r-full);
 }
 
 /* ---------- archetypes ---------- */
