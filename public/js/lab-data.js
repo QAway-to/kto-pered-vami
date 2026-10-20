@@ -96,6 +96,7 @@ export const MOTIVES = {
   hsp: 'сохранить безопасность и гармонию, не перегрузиться и быть понятым',
   secure: 'построить честный, взаимный контакт и сохранить свои границы',
   schizoid: 'сохранить автономию и ясность мышления, избежать эмоциональной суеты и обсудить суть',
+  'control-freak': 'подчинить ситуацию регламенту, устранить хаос и заставить собеседника действовать по правилам',
 };
 
 /** How the relationship ended, as judged by the analyst. */
@@ -120,6 +121,7 @@ export const PERSONA_NAMES = {
   hsp: 'Соня',
   secure: 'Марина',
   schizoid: 'Глеб',
+  'control-freak': 'Вадим',
 };
 
 /** Random intro index for a scenario, different from `current` when there is a choice. */

@@ -47,6 +47,13 @@ test('GET archetype direct pages and aliases with open graph metadata', async ()
   const resDark = await request(app).get('/dark-empath').expect(200);
   assert.match(resDark.text, /Тёмный эмпат/);
 
+  const resControl = await request(app).get('/control-freak').expect(200);
+  assert.match(resControl.text, /Контролёр/);
+  assert.match(resControl.text, /\/img\/archetypes\/control-freak\.webp/);
+
+  const resController = await request(app).get('/controller').expect(200);
+  assert.match(resController.text, /Контролёр/);
+
   const resTest = await request(app).get('/test').expect(200);
   assert.match(resTest.text, /Кто перед вами/);
 });

@@ -22,12 +22,9 @@ if (!analytics) console.warn('POSTHOG_KEY not set: product analytics is disabled
  * @returns {Promise<import('./src/auth-routes.js').AuthConfig>}
  */
 async function authFromEnv(env) {
-  // Explicit switch only: auth is off when AUTH_MODE=off is set on purpose, never by accident.
-  if (env.AUTH_MODE === 'off') {
-    const production = env.NODE_ENV === 'production' || Boolean(env.RENDER);
-    console.warn(production
-      ? 'WARNING: AUTH_MODE=off in production. Login and subscription checks are disabled; AI trainings are open to everyone (rate limits and AI_CALLS_PER_HOUR still apply).'
-      : 'AUTH_MODE=off: login and subscription checks are disabled.');
+  // Auth is disabled (open mode) by default or when AUTH_MODE !== 'on'. Set AUTH_MODE=on to require Telegram auth.
+  if (env.AUTH_MODE !== 'on') {
+    console.warn('Auth is disabled (open mode): login and subscription checks are skipped. Full access to trainings.');
     return { mode: 'open' };
   }
   const botToken = env.AUTORIZATION_BOT?.trim();

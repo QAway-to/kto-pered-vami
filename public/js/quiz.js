@@ -54,6 +54,7 @@ export const PROTOTYPES = {
   hsp: { high: ['SPS', 'AEMP'], low: ['PSY'] },
   secure: { high: ['LIGHT'], low: ['ANX', 'AVO', 'EMO', 'MACH'] },
   schizoid: { high: ['AVO'], low: ['ANX', 'AEMP', 'EMO', 'GNARC'] },
+  'control-freak': { high: ['ALEX', 'ANX'], low: ['PSY', 'EMO', 'AVO'] },
 };
 
 /**

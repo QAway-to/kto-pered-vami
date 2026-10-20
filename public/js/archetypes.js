@@ -220,6 +220,33 @@ export const ARCHETYPES = {
       'World Health Organization (2022). ICD-11: Personality disorder and related traits — Detachment domain.',
     ],
   },
+  'control-freak': {
+    name: 'Контролёр',
+    aka: 'Контрол-фрик, микроменеджер',
+    flagsTitle: 'Что может быть трудно',
+    tagline: 'Уверен, что мир рухнет без его надзора — и контролирует каждый шаг и вздох.',
+    color: '#2e6b75',
+    coreTrait: 'Контроль и регламент',
+    traits: { empathy: 2, rationality: 10, autonomy: 8, influence: 9, sensitivity: 3, masking: 2 },
+    construct: 'Ананкастный паттерн (ICD-11)',
+    science: 'Ананкастный домен (ICD-11) и обсессивно-компульсивная организация личности (OCPD) описывают фиксацию на правилах, стандартах, порядке и контроле над собой и окружающими. В основе лежит глубинная тревога перед неопределенностью и ошибками. Человек не способен делегировать («сделают не так»), склонен к постоянному микроменеджменту, педантизму и морализаторству, принося отношения и гибкость в жертву регламенту.',
+    signs: [
+      'Постоянно перепроверяет работу за другими и переделывает сам',
+      'Раздражается при малейшем отклонении от плана или договоренностей',
+      'Навязывает окружающим свои стандарты правильного поведения',
+    ],
+    flags: [
+      'Тотальный микроменеджмент и отчет за каждый шаг',
+      'Обесценивание чужих усилий («можно было сделать качественнее»)',
+      'Неспособность признать собственную неправоту или пойти на компромисс',
+    ],
+    howTo: 'Фиксируйте рамки и зоны ответственности заранее. Не вступайте в эмоциональные споры о принципах — опирайтесь на факты, чек-листы и измеримые результаты. Давайте ему регулярную прозрачную предсказуемость, чтобы снизить его тревогу.',
+    refs: [
+      'World Health Organization (2022). ICD-11: 6D11.4 Anankastia domain in personality disorder.',
+      'American Psychiatric Association (2013). Obsessive-Compulsive Personality Disorder. DSM-5.',
+      'McWilliams, N. (2011). Psychoanalytic Diagnosis: Obsessive and Compulsive Personalities. Guilford Press.',
+    ],
+  },
 };
 
 export const ARCHETYPE_IDS = Object.freeze(Object.keys(ARCHETYPES));
@@ -248,6 +275,10 @@ export const ARCHETYPE_SLUGS = Object.freeze({
   'shizo': 'schizoid',
   'shizoid': 'schizoid',
   'secure': 'secure',
+  'control-freak': 'control-freak',
+  'controller': 'control-freak',
+  'control': 'control-freak',
+  'anankastic': 'control-freak',
   // Cyrillic aliases
   'шизоид': 'schizoid',
   'шизо': 'schizoid',
@@ -257,6 +288,9 @@ export const ARCHETYPE_SLUGS = Object.freeze({
   'психопат': 'psychopath',
   'надежный': 'secure',
   'надёжный': 'secure',
+  'контролер': 'control-freak',
+  'контролёр': 'control-freak',
+  'перфекционист': 'control-freak',
 });
 
 // Add an id here once /img/archetypes/<id>.webp exists; until then the card shows a monogram placeholder.
