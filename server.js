@@ -22,11 +22,12 @@ if (!analytics) console.warn('POSTHOG_KEY not set: product analytics is disabled
  * @returns {Promise<import('./src/auth-routes.js').AuthConfig>}
  */
 async function authFromEnv(env) {
-  const production = env.NODE_ENV === 'production' || Boolean(env.RENDER);
-  if (env.AUTH_MODE === 'off' && production) {
-    console.error('AUTH_MODE=off is ignored in production: login stays on.');
-  } else if (env.AUTH_MODE === 'off') {
-    console.warn('AUTH_MODE=off: login and subscription checks are disabled. Never use this in production.');
+  // Explicit switch only: auth is off when AUTH_MODE=off is set on purpose, never by accident.
+  if (env.AUTH_MODE === 'off') {
+    const production = env.NODE_ENV === 'production' || Boolean(env.RENDER);
+    console.warn(production
+      ? 'WARNING: AUTH_MODE=off in production. Login and subscription checks are disabled; AI trainings are open to everyone (rate limits and AI_CALLS_PER_HOUR still apply).'
+      : 'AUTH_MODE=off: login and subscription checks are disabled.');
     return { mode: 'open' };
   }
   const botToken = env.AUTORIZATION_BOT?.trim();
