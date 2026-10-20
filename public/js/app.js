@@ -57,12 +57,13 @@ document.addEventListener('click', () => {
 
 function traitsView(traits, color) {
   if (!traits) return null;
-  return h('div', { class: 'arch-trait-tokens', attrs: { role: 'list', 'aria-label': 'Психологические качества' } }, TRAIT_KEYS.map((k) => {
+  return h('div', { class: 'arch-trait-tokens', attrs: { role: 'list', 'aria-label': 'Психологические качества' } }, TRAIT_KEYS.map((k, idx) => {
     const def = TRAIT_DEFINITIONS[k];
     const val = traits[k] ?? 5;
     const isDom = val >= 8;
+    const edgeClass = idx <= 1 ? 'is-edge-left' : (idx >= TRAIT_KEYS.length - 2 ? 'is-edge-right' : '');
     const token = h('div', {
-      class: `arch-trait-token ${isDom ? 'is-dominant' : ''}`,
+      class: `arch-trait-token ${isDom ? 'is-dominant' : ''} ${edgeClass}`.trim(),
       vars: { '--c': color },
       attrs: {
         tabindex: '0',
@@ -111,15 +112,22 @@ function renderHome() {
     return h('button', { class: 'arch-card', on: { click: () => go('type', id) }, attrs: { 'aria-label': a.name } }, [
       media(id),
       h('div', { class: 'arch-body' }, [
-        h('h3', { text: a.name }),
-        h('span', { class: 'arch-aka', text: a.aka }),
-        a.coreTrait && h('div', { class: 'arch-core-pill' }, [
-          h('span', { class: 'arch-core-label', text: 'Ядро' }),
-          h('span', { class: 'arch-core-val', text: a.coreTrait }),
+        h('div', { class: 'arch-card-header' }, [
+          h('h3', { text: a.name }),
+          h('span', { class: 'arch-aka', text: a.aka }),
+          a.coreTrait && h('div', { class: 'arch-core-pill' }, [
+            h('span', { class: 'arch-core-label', text: 'Ядро' }),
+            h('span', { class: 'arch-core-val', text: a.coreTrait }),
+          ]),
+        ].filter(Boolean)),
+        h('div', { class: 'arch-card-main' }, [
+          h('p', { class: 'arch-tagline', text: a.tagline }),
+          traitsView(a.traits, a.color),
         ]),
-        h('p', { class: 'arch-tagline', text: a.tagline }),
-        traitsView(a.traits, a.color),
-        h('span', { class: 'arch-construct', text: a.construct }),
+        h('div', { class: 'arch-card-footer' }, [
+          h('span', { class: 'arch-construct-label', text: 'База:' }),
+          h('span', { class: 'arch-construct', text: a.construct }),
+        ]),
       ]),
     ]);
   }));
