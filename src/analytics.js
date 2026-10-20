@@ -11,11 +11,14 @@ export const EVENTS = Object.freeze([
   'spar_completed',
   'lab_started',
   'lab_completed',
+  'login_completed',
+  'paywall_shown',
+  'subscription_confirmed',
 ]);
 
 export const PROP_KEYS = Object.freeze([
   'platform', 'source', 'medium', 'campaign',
-  'archetype', 'guess', 'correct', 'known', 'scenario', 'turns', 'a', 'b', 'winner',
+  'archetype', 'guess', 'correct', 'known', 'scenario', 'turns', 'a', 'b', 'winner', 'method',
 ]);
 
 const DISTINCT_ID = /^[A-Za-z0-9-]{8,64}$/;

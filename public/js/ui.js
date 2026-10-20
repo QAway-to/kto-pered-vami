@@ -2,6 +2,7 @@
 
 import { ARCHETYPES, archetypeImage } from './archetypes.js';
 import { SCENARIOS, SCENARIO_IDS } from './lab-data.js';
+import { getToken, setToken } from './session.js';
 
 /**
  * Tiny DOM builder. Text is always set via textContent (no innerHTML → no XSS).
@@ -47,17 +48,39 @@ export const store = {
   },
 };
 
-export async function api(path, body) {
+/**
+ * JSON API call with the session token. Errors carry `status` and `code`; a missing login or subscription
+ * also raises a `kpv:auth` window event so the login or subscription dialog opens wherever the call came from.
+ * @param {string} path
+ * @param {object} [body] - POST body; omitted = GET
+ * @param {{quiet?: boolean}} [opts] - quiet: do not raise `kpv:auth`
+ */
+export async function api(path, body, { quiet = false } = {}) {
+  const headers = body ? { 'Content-Type': 'application/json' } : {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`/api${path}`, {
     method: body ? 'POST' : 'GET',
-    headers: body ? { 'Content-Type': 'application/json' } : {},
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   let json;
   try { json = await res.json(); } catch { throw new Error('Сервер вернул некорректный ответ'); }
-  if (!json.success) throw new Error(json.error || 'Ошибка запроса');
+  if (!json.success) {
+    const err = new Error(json.error || 'Ошибка запроса');
+    err.status = res.status;
+    err.code = json.code ?? null;
+    if (json.code === 'auth_required') setToken(null);
+    if (!quiet && (json.code === 'auth_required' || json.code === 'subscription_required')) {
+      window.dispatchEvent(new CustomEvent('kpv:auth', { detail: { reason: json.code } }));
+    }
+    throw err;
+  }
   return json.data;
 }
+
+/** True for errors that the login or subscription dialog already handles. */
+export const isAuthError = (err) => err?.code === 'auth_required' || err?.code === 'subscription_required';
 
 /** Archetype artwork: generated image when available, monogram on a tinted gradient otherwise. */
 export function media(id, size = '') {

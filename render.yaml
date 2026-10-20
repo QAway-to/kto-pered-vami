@@ -18,6 +18,15 @@ services:
         sync: false
       - key: AI_CALLS_PER_HOUR
         value: "300"
+      # Telegram login + subscription. Without these the AI trainings stay closed (test and flags still work).
+      - key: AUTORIZATION_BOT
+        sync: false # bot token from @BotFather
+      - key: TELEGRAM_CHAT_ID
+        sync: false # channel/chat whose members get full access, e.g. -1001234567890; the bot must be an admin there
+      - key: TELEGRAM_CHANNEL_URL
+        sync: false # invite link shown on the subscription screen
+      - key: SESSION_SECRET
+        generateValue: true # signs sessions and tickets; changing it logs everyone out
       # PostHog project API key (phc_...). Empty = analytics off.
       - key: POSTHOG_KEY
         sync: false

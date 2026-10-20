@@ -1,7 +1,8 @@
 import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
 import { QUESTIONS, LIKERT, DIMENSIONS, DIM_KEYS, scoreDimensions, rankArchetypes } from './quiz.js';
 import { CASES } from './cases.js';
-import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech } from './ui.js';
+import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech, isAuthError } from './ui.js';
+import { initAuth } from './auth.js';
 import { SCENARIO_IDS, SCENARIOS, randomIntro } from './lab-data.js';
 import { renderLab } from './lab-ui.js';
 import { track } from './track.js';
@@ -59,7 +60,7 @@ function renderHome() {
     'stats',
     h('span', { class: 'pill', text: my ? `Вам ближе: ${chip(my.ranked[0].id)}` : 'Тест ещё не пройден' }),
     h('span', { class: 'pill', text: `Красные флаги: ${cases.right}/${cases.total}` }),
-    h('span', { class: 'pill', text: `Спарринг: ${dialogs.right}/${dialogs.total}` }),
+    h('span', { class: 'pill', text: `Профайлинг: ${dialogs.right}/${dialogs.total}` }),
     skill != null && h('span', { class: 'pill pill-accent', text: `Навык: ${skill}/10` }),
   );
   mount('archetype-grid', ...ARCHETYPE_IDS.map((id) => {
@@ -243,7 +244,8 @@ let startToken = 0;
 /** Scene chosen before the dialog starts; personaId null = hidden random persona. */
 let setup = { personaId: null, scenario: SCENARIO_IDS[0], intro: randomIntro(SCENARIO_IDS[0]) };
 
-const sceneOf = (d) => ({ scenario: d.scenario, intro: d.intro });
+// The server's training ticket rides along with every call after the opening line.
+const sceneOf = (d) => ({ scenario: d.scenario, intro: d.intro, ...(d.ticket ? { ticket: d.ticket } : {}) });
 
 /** Opens the scene: picks the persona, then asks it for its opening line. */
 async function startDialog() {
@@ -258,13 +260,14 @@ async function startDialog() {
     track('spar_started', { known: dialog.known, scenario, archetype: p.personaId });
     renderDialog();
     const current = dialog;
-    const { reply } = await api('/chat', { personaId: p.personaId, ...sceneOf(current), messages: [] });
+    const { reply, ticket } = await api('/chat', { personaId: p.personaId, ...sceneOf(current), messages: [] });
     if (dialog !== current) return;
-    dialog = { ...dialog, messages: [{ role: 'assistant', content: reply }], busy: false };
+    dialog = { ...dialog, ticket, messages: [{ role: 'assistant', content: reply }], busy: false };
     renderDialog();
   } catch (err) {
     if (token !== startToken) return;
     dialog = null;
+    if (isAuthError(err)) { renderSetup(); return; } // the login / subscription dialog is already open
     mount('dialog-body', h('p', { class: 'error', text: err.message }), h('button', { class: 'btn btn-ghost', text: 'Назад', on: { click: () => renderDialog() } }));
   }
 }
@@ -462,3 +465,4 @@ function renderDebrief(result) {
 
 track('app_opened');
 renderHome();
+initAuth();

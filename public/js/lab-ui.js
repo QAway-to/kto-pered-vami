@@ -152,13 +152,14 @@ async function runExperiment(resume = false) {
       }
 
       setState({ run: { ...state.run, typing: true, streaming: false } });
-      const turnPromise = api('/lab/turn', { a, b, scenario, intro, transcript: lines });
+      const turnPromise = api('/lab/turn', { a, b, scenario, intro, transcript: lines, ticket: state.run?.ticket });
       const typingWait = sleep(getTypingDelay(state.speed), token);
-      const [{ speaker, text }] = await Promise.all([turnPromise, typingWait]);
+      const [{ speaker, text, ticket }] = await Promise.all([turnPromise, typingWait]);
       if (token !== runToken) return;
 
       lines = [...lines, { speaker, text: '' }];
-      setState({ run: { ...state.run, transcript: lines, typing: false, streaming: true } });
+      // The first line comes with the run's ticket; later turns and the verdict send it back.
+      setState({ run: { ...state.run, ...(ticket ? { ticket } : {}), transcript: lines, typing: false, streaming: true } });
 
       const streamedText = await streamText(text, state.speed, token);
       if (token !== runToken) return;
@@ -172,7 +173,7 @@ async function runExperiment(resume = false) {
     if (token !== runToken) return;
 
     setState({ run: { ...state.run, status: 'judging', typing: true, streaming: false } });
-    const verdictPromise = api('/lab/verdict', { a, b, scenario, intro, transcript: lines });
+    const verdictPromise = api('/lab/verdict', { a, b, scenario, intro, transcript: lines, ticket: state.run?.ticket });
     const judgingWait = sleep(getJudgingDelay(state.speed), token);
     const [verdict] = await Promise.all([verdictPromise, judgingWait]);
     if (token !== runToken) return;

@@ -5,13 +5,14 @@ import { LlmError } from './llm.js';
 import { PERSONAS, PERSONA_IDS, publicPersona, trainerSystem } from './personas.js';
 import { isScene, sceneCue, sceneSummary } from './scene.js';
 import { validateMessages, isPersonaId, MAX_ASSISTANT_CHARS } from './validate.js';
-import { createRateLimiter } from './rateLimit.js';
+import { createRateLimiter, createCounter } from './rateLimit.js';
 import { validateTrack } from './analytics.js';
 import { scoreInstruction, parseScores } from './skill.js';
 import {
   validateLabRequest, nextSpeaker, labSystem, labMessages, verdictPrompt, parseVerdict, MAX_LINE_CHARS,
 } from './lab.js';
 import { ARCHETYPES, ARCHETYPE_IDS } from '../public/js/archetypes.js';
+import { createAuth, createGate, authRouter, webhookGuard, telegramWebhook } from './auth-routes.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(here, '..', 'public');
@@ -90,8 +91,11 @@ function parseTranscript(messages, opts) {
  */
 export function createApp({
   llm, analytics = null, rateLimit = { windowMs: 60_000, max: 40 }, labRateLimit = { windowMs: 600_000, max: 45 },
-  trackRateLimit = { windowMs: 60_000, max: 120 }, aiCallsPerHour = 300,
+  trackRateLimit = { windowMs: 60_000, max: 120 }, aiCallsPerHour = 300, auth: authConfig = null,
 }) {
+  // No auth config = open mode (local dev, tests). Production passes a Telegram config from server.js.
+  const auth = createAuth(authConfig);
+  const gate = createGate(auth);
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1); // Render sits behind one proxy
@@ -118,9 +122,14 @@ export function createApp({
     },
   );
 
+  // Bot updates come from Telegram's servers, so they skip the per-IP limiter. The secret header is checked
+  // before the body is parsed, so unauthenticated requests cost nothing.
+  app.post('/api/telegram/webhook', webhookGuard(auth), express.json({ limit: '64kb' }), telegramWebhook(auth));
+
   const api = express.Router();
   api.use(createRateLimiter(rateLimit)); // before body parsing so blocked clients cost nothing
   api.use(express.json({ limit: '64kb' }));
+  api.use(authRouter(auth)); // before the AI-availability check: login must work without an AI key
 
   api.get('/persona/:id', (req, res) => {
     const { id } = req.params;
@@ -136,17 +145,19 @@ export function createApp({
     return next();
   });
 
-  // Global cap on paid AI calls across all clients: bounds spend even if per-IP limits are bypassed.
-  const aiBudget = createRateLimiter({
-    windowMs: 3_600_000,
-    max: aiCallsPerHour,
-    key: () => 'global',
-    status: 503,
-    message: 'Лимит ИИ-тренировок на этот час исчерпан. Попробуйте позже — кейсы и тест работают.',
-  });
+  // Global cap on paid AI calls across all clients. Spent only after validation and the access gate,
+  // so anonymous or malformed requests cannot exhaust it for subscribers.
+  const aiBudget = createCounter({ windowMs: 3_600_000, max: aiCallsPerHour });
+  const spend = (res, refund = () => {}) => {
+    if (aiBudget.take()) return true;
+    refund();
+    res.setHeader('Retry-After', aiBudget.retryAfter());
+    res.status(503).json(fail('Лимит ИИ-тренировок на этот час исчерпан. Попробуйте позже — кейсы и тест работают.'));
+    return false;
+  };
 
-  api.post('/chat', aiBudget, async (req, res, next) => {
-    const { personaId, scenario, intro, messages } = req.body ?? {};
+  api.post('/chat', async (req, res, next) => {
+    const { personaId, scenario, intro, messages, ticket } = req.body ?? {};
     if (!isPersonaId(personaId)) return res.status(400).json(fail('Неизвестный персонаж'));
     if (!isScene(scenario, intro)) return res.status(400).json(fail('Неизвестная сцена'));
     // An empty transcript asks the persona for its opening line.
@@ -155,6 +166,12 @@ export function createApp({
     if (parsed.value.length > 0 && parsed.value.at(-1).role !== 'user') {
       return res.status(400).json(fail('Последняя реплика должна быть вашей'));
     }
+    const ref = `${personaId}|${scenario}|${intro}`;
+    const starting = parsed.value.length === 0;
+    const access = starting
+      ? await gate.start(req, res, 'profiling', ref)
+      : (await gate.resume(req, res, 'profiling', ref, ticket)) && { ticket: null, refund: () => {} };
+    if (!access || !spend(res, access.refund)) return undefined;
     try {
       const reply = await llm.complete({
         system: trainerSystem(personaId, scenario, intro),
@@ -163,14 +180,18 @@ export function createApp({
         maxTokens: 800,
       });
       const safeReply = reply ? reply.slice(0, MAX_ASSISTANT_CHARS) : null;
-      return res.json(ok({ reply: safeReply ?? '…(собеседник не ответил на это сообщение — попробуйте сформулировать иначе)' }));
+      return res.json(ok({
+        reply: safeReply ?? '…(собеседник не ответил на это сообщение — попробуйте сформулировать иначе)',
+        ...(access.ticket ? { ticket: access.ticket } : {}),
+      }));
     } catch (err) {
+      access.refund(); // a failed opening line should not burn the free try
       return next(err);
     }
   });
 
-  api.post('/debrief', aiBudget, async (req, res, next) => {
-    const { personaId, scenario, intro, messages, guess, known } = req.body ?? {};
+  api.post('/debrief', async (req, res, next) => {
+    const { personaId, scenario, intro, messages, guess, known, ticket } = req.body ?? {};
     if (!isPersonaId(personaId)) return res.status(400).json(fail('Неизвестный персонаж'));
     if (!isScene(scenario, intro)) return res.status(400).json(fail('Неизвестная сцена'));
     if (!ARCHETYPE_IDS.includes(guess)) return res.status(400).json(fail('Выберите архетип'));
@@ -179,6 +200,7 @@ export function createApp({
     if (!parsed.value.some((m) => m.role === 'user')) {
       return res.status(400).json(fail('Сначала напишите хотя бы одну реплику'));
     }
+    if (!(await gate.resume(req, res, 'profiling', `${personaId}|${scenario}|${intro}`, ticket)) || !spend(res)) return undefined;
     const persona = PERSONAS[personaId];
     const prompt = `Сцена: ${sceneSummary(scenario, intro)}
 Персонаж: ${persona.name}. Настоящий архетип: ${ARCHETYPES[personaId].name} (${ARCHETYPES[personaId].construct}).
@@ -212,10 +234,15 @@ ${formatTranscript(parsed.value, persona.name)}
     message: 'Слишком много экспериментов подряд. Подождите несколько минут.',
   });
 
-  api.post('/lab/turn', labLimit, aiBudget, async (req, res, next) => {
+  api.post('/lab/turn', labLimit, async (req, res, next) => {
     const parsed = validateLabRequest(req.body);
     if (!parsed.ok) return res.status(400).json(fail(parsed.error));
     const { a, b, scenario, intro, transcript } = parsed.value;
+    const ref = `${a}|${b}|${scenario}|${intro}`;
+    const access = transcript.length === 0
+      ? await gate.start(req, res, 'arena', ref)
+      : (await gate.resume(req, res, 'arena', ref, req.body?.ticket)) && { ticket: null, refund: () => {} };
+    if (!access || !spend(res, access.refund)) return undefined;
     const speaker = nextSpeaker(transcript);
     const [self, other] = speaker === 'a' ? [a, b] : [b, a];
     try {
@@ -225,15 +252,22 @@ ${formatTranscript(parsed.value, persona.name)}
         mode: 'chat',
         maxTokens: 600,
       });
-      return res.json(ok({ speaker, text: (line ?? '…').slice(0, MAX_LINE_CHARS) }));
+      return res.json(ok({
+        speaker,
+        text: (line ?? '…').slice(0, MAX_LINE_CHARS),
+        ...(access.ticket ? { ticket: access.ticket } : {}),
+      }));
     } catch (err) {
+      access.refund();
       return next(err);
     }
   });
 
-  api.post('/lab/verdict', labLimit, aiBudget, async (req, res, next) => {
+  api.post('/lab/verdict', labLimit, async (req, res, next) => {
     const parsed = validateLabRequest(req.body, { forVerdict: true });
     if (!parsed.ok) return res.status(400).json(fail(parsed.error));
+    const { a, b, scenario, intro } = parsed.value;
+    if (!(await gate.resume(req, res, 'arena', `${a}|${b}|${scenario}|${intro}`, req.body?.ticket)) || !spend(res)) return undefined;
     const { system, user } = verdictPrompt(parsed.value);
     try {
       const reply = await llm.complete({
