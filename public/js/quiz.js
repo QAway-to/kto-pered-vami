@@ -53,6 +53,7 @@ export const PROTOTYPES = {
   avoidant: { high: ['AVO', 'ALEX'], low: ['ANX'] },
   hsp: { high: ['SPS', 'AEMP'], low: ['PSY'] },
   secure: { high: ['LIGHT'], low: ['ANX', 'AVO', 'EMO', 'MACH'] },
+  schizoid: { high: ['AVO'], low: ['ANX', 'AEMP', 'EMO', 'GNARC'] },
 };
 
 /**

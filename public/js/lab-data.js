@@ -81,6 +81,7 @@ export const DOMINANTS = {
   avoidant: { name: 'Автономия и дистанция', focus: 'Откат назад и эмоциональная броня' },
   hsp: { name: 'Сенсорная безопасность', focus: 'Защита от перегрузки и поиск искренности' },
   secure: { name: 'Взаимность и границы', focus: 'Устойчивость, прямота и равный диалог' },
+  schizoid: { name: 'Абсолютная автономия', focus: 'Защита ментального пространства и концептуализация' },
 };
 
 /** What each archetype is really after — its payoff in the game. */
@@ -94,6 +95,7 @@ export const MOTIVES = {
   avoidant: 'сохранить независимость и дистанцию, не дать втянуть себя в эмоциональную зависимость',
   hsp: 'сохранить безопасность и гармонию, не перегрузиться и быть понятым',
   secure: 'построить честный, взаимный контакт и сохранить свои границы',
+  schizoid: 'сохранить автономию и ясность мышления, избежать эмоциональной суеты и обсудить суть',
 };
 
 /** How the relationship ended, as judged by the analyst. */
@@ -117,6 +119,7 @@ export const PERSONA_NAMES = {
   avoidant: 'Илья',
   hsp: 'Соня',
   secure: 'Марина',
+  schizoid: 'Глеб',
 };
 
 /** Random intro index for a scenario, different from `current` when there is a choice. */

@@ -1,4 +1,4 @@
-import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
+import { ARCHETYPES, ARCHETYPE_IDS, TRAIT_LABELS, TRAIT_KEYS } from './archetypes.js';
 import { QUESTIONS, LIKERT, DIMENSIONS, DIM_KEYS, scoreDimensions, rankArchetypes } from './quiz.js';
 import { CASES } from './cases.js';
 import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech, isAuthError } from './ui.js';
@@ -51,6 +51,20 @@ document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click'
 
 /* ---------- home: archetype cards ---------- */
 
+function traitsView(traits, color) {
+  if (!traits) return null;
+  return h('div', { class: 'arch-traits' }, TRAIT_KEYS.map((k) => {
+    const val = traits[k] ?? 5;
+    return h('div', { class: 'arch-trait-row' }, [
+      h('span', { class: 'arch-trait-label', text: TRAIT_LABELS[k] }),
+      h('div', { class: 'arch-trait-track' }, [
+        h('div', { class: 'arch-trait-fill', vars: { width: `${val * 10}%`, background: color } }),
+      ]),
+      h('span', { class: 'arch-trait-val', text: String(val) }),
+    ]);
+  }));
+}
+
 function renderHome() {
   const my = loadResult();
   const cases = store.get('cases', { right: 0, total: 0 });
@@ -70,7 +84,12 @@ function renderHome() {
       h('div', { class: 'arch-body' }, [
         h('h3', { text: a.name }),
         h('span', { class: 'arch-aka', text: a.aka }),
+        a.coreTrait && h('div', { class: 'arch-core-pill' }, [
+          h('span', { class: 'arch-core-label', text: 'Ядро' }),
+          h('span', { class: 'arch-core-val', text: a.coreTrait }),
+        ]),
         h('p', { class: 'arch-tagline', text: a.tagline }),
+        traitsView(a.traits, a.color),
         h('span', { class: 'arch-construct', text: a.construct }),
       ]),
     ]);
@@ -101,6 +120,27 @@ function renderType(id) {
           h('button', { class: 'btn btn-ghost', text: 'Свести в лаборатории', on: { click: () => go('lab', id) } }),
         ]),
       ]),
+    ]),
+    h('div', { class: 'card arch-profile-card' }, [
+      h('div', { class: 'row arch-profile-head' }, [
+        h('h3', { text: 'Психологический профиль' }),
+        a.coreTrait && h('div', { class: 'arch-core-badge' }, [
+          h('span', { class: 'arch-core-label', text: 'Ядро характера:' }),
+          h('span', { class: 'arch-core-val', text: a.coreTrait }),
+        ]),
+      ]),
+      h('div', { class: 'arch-profile-grid' }, TRAIT_KEYS.map((k) => {
+        const val = a.traits?.[k] ?? 5;
+        return h('div', { class: 'arch-profile-item' }, [
+          h('div', { class: 'arch-profile-item-head' }, [
+            h('span', { class: 'arch-trait-label', text: TRAIT_LABELS[k] }),
+            h('strong', { class: 'arch-profile-val', vars: { color: a.color }, text: `${val}/10` }),
+          ]),
+          h('div', { class: 'bar-track' }, [
+            h('div', { class: 'bar-fill', vars: { width: `${val * 10}%`, background: a.color } }),
+          ]),
+        ]);
+      })),
     ]),
     h('div', { class: 'card' }, [h('h3', { text: 'Научная основа' }), h('p', { text: a.science })]),
     h('div', { class: 'grid' }, [
