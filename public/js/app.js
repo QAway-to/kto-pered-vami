@@ -1,4 +1,4 @@
-import { ARCHETYPES, ARCHETYPE_IDS, TRAIT_LABELS, TRAIT_KEYS } from './archetypes.js';
+import { ARCHETYPES, ARCHETYPE_IDS, TRAIT_DEFINITIONS, TRAIT_KEYS } from './archetypes.js';
 import { QUESTIONS, LIKERT, DIMENSIONS, DIM_KEYS, scoreDimensions, rankArchetypes } from './quiz.js';
 import { CASES } from './cases.js';
 import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech, isAuthError } from './ui.js';
@@ -51,17 +51,46 @@ document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click'
 
 /* ---------- home: archetype cards ---------- */
 
+document.addEventListener('click', () => {
+  document.querySelectorAll('.arch-trait-token.is-open').forEach((el) => el.classList.remove('is-open'));
+});
+
 function traitsView(traits, color) {
   if (!traits) return null;
-  return h('div', { class: 'arch-traits' }, TRAIT_KEYS.map((k) => {
+  return h('div', { class: 'arch-trait-tokens', attrs: { role: 'list', 'aria-label': 'Психологические качества' } }, TRAIT_KEYS.map((k) => {
+    const def = TRAIT_DEFINITIONS[k];
     const val = traits[k] ?? 5;
-    return h('div', { class: 'arch-trait-row' }, [
-      h('span', { class: 'arch-trait-label', text: TRAIT_LABELS[k] }),
-      h('div', { class: 'arch-trait-track' }, [
-        h('div', { class: 'arch-trait-fill', vars: { width: `${val * 10}%`, background: color } }),
-      ]),
+    const isDom = val >= 8;
+    const token = h('div', {
+      class: `arch-trait-token ${isDom ? 'is-dominant' : ''}`,
+      vars: { '--c': color },
+      attrs: {
+        tabindex: '0',
+        role: 'button',
+        title: `${def.name}: ${val}/10 — ${def.desc}`,
+        'aria-label': `${def.name}: ${val}/10. ${def.desc}`,
+      },
+      on: {
+        click: (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const wasOpen = token.classList.contains('is-open');
+          document.querySelectorAll('.arch-trait-token.is-open').forEach((el) => el.classList.remove('is-open'));
+          if (!wasOpen) token.classList.add('is-open');
+        },
+      },
+    }, [
+      h('span', { class: 'arch-trait-abbr', text: def.abbr }),
       h('span', { class: 'arch-trait-val', text: String(val) }),
+      h('div', { class: 'arch-trait-popover' }, [
+        h('div', { class: 'arch-trait-popover-head' }, [
+          h('strong', { text: `${def.name} · ${val}/10` }),
+          isDom && h('span', { class: 'arch-dom-tag', vars: { color }, text: 'Доминанта' }),
+        ].filter(Boolean)),
+        h('p', { text: def.desc }),
+      ]),
     ]);
+    return token;
   }));
 }
 
@@ -130,15 +159,22 @@ function renderType(id) {
         ]),
       ]),
       h('div', { class: 'arch-profile-grid' }, TRAIT_KEYS.map((k) => {
+        const def = TRAIT_DEFINITIONS[k];
         const val = a.traits?.[k] ?? 5;
-        return h('div', { class: 'arch-profile-item' }, [
+        const isDom = val >= 8;
+        return h('div', { class: `arch-profile-item ${isDom ? 'is-dominant' : ''}` }, [
           h('div', { class: 'arch-profile-item-head' }, [
-            h('span', { class: 'arch-trait-label', text: TRAIT_LABELS[k] }),
-            h('strong', { class: 'arch-profile-val', vars: { color: a.color }, text: `${val}/10` }),
+            h('div', { class: 'row arch-profile-trait-title' }, [
+              h('span', { class: `arch-token-pill ${isDom ? 'is-dominant' : ''}`, vars: { '--c': a.color }, text: def.abbr }),
+              h('strong', { text: def.name }),
+              isDom && h('span', { class: 'arch-dom-tag', vars: { color: a.color }, text: 'Доминанта' }),
+            ].filter(Boolean)),
+            h('strong', { class: 'arch-profile-val', vars: { color: isDom ? a.color : 'var(--muted)' }, text: `${val}/10` }),
           ]),
           h('div', { class: 'bar-track' }, [
-            h('div', { class: 'bar-fill', vars: { width: `${val * 10}%`, background: a.color } }),
+            h('div', { class: 'bar-fill', vars: { width: `${val * 10}%`, background: isDom ? a.color : 'var(--muted)' } }),
           ]),
+          h('p', { class: 'arch-profile-desc', text: def.desc }),
         ]);
       })),
     ]),

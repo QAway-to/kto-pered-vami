@@ -1,16 +1,44 @@
 // 10 archetypes: scientific name on the card, social-media name as `aka`, peer-reviewed construct and sources inside.
 // Shared by the browser and the server. Images go to /img/archetypes/<id>.webp (placeholder until generated).
 
-export const TRAIT_LABELS = Object.freeze({
-  empathy: 'Эмпатия',
-  rationality: 'Рациональность',
-  autonomy: 'Автономия',
-  influence: 'Влияние',
-  sensitivity: 'Чувствительность',
-  masking: 'Маскировка',
+export const TRAIT_DEFINITIONS = Object.freeze({
+  empathy: {
+    abbr: 'Э',
+    name: 'Эмпатия',
+    desc: 'Способность считывать чужие эмоции, мотивы и сопереживать.',
+  },
+  rationality: {
+    abbr: 'Р',
+    name: 'Рациональность',
+    desc: 'Опора на строгую логику, факты и стратегический расчёт.',
+  },
+  autonomy: {
+    abbr: 'А',
+    name: 'Автономия',
+    desc: 'Психологическая независимость от чужих оценок и самодостаточность.',
+  },
+  influence: {
+    abbr: 'В',
+    name: 'Влияние',
+    desc: 'Стремление управлять фреймом ситуации, статусом и людьми.',
+  },
+  sensitivity: {
+    abbr: 'Ч',
+    name: 'Чувствительность',
+    desc: 'Уязвимость эго, глубина эмоционального отклика на стресс и критику.',
+  },
+  masking: {
+    abbr: 'М',
+    name: 'Маскировка',
+    desc: 'Харизма, обаяние и способность скрывать истинные мотивы.',
+  },
 });
 
-export const TRAIT_KEYS = Object.freeze(Object.keys(TRAIT_LABELS));
+export const TRAIT_KEYS = Object.freeze(Object.keys(TRAIT_DEFINITIONS));
+
+export const TRAIT_LABELS = Object.freeze(
+  Object.fromEntries(TRAIT_KEYS.map((k) => [k, TRAIT_DEFINITIONS[k].name]))
+);
 
 export const ARCHETYPES = {
   'dark-empath': {
