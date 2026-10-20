@@ -46,7 +46,7 @@ function renderHome() {
     'stats',
     h('span', { class: 'pill', text: my ? `Вам ближе: ${chip(my.ranked[0].id)}` : 'Тест ещё не пройден' }),
     h('span', { class: 'pill', text: `Красные флаги: ${cases.right}/${cases.total}` }),
-    h('span', { class: 'pill', text: `Тренажёр: ${dialogs.right}/${dialogs.total}` }),
+    h('span', { class: 'pill', text: `Спарринг: ${dialogs.right}/${dialogs.total}` }),
   );
   mount('archetype-grid', ...ARCHETYPE_IDS.map((id) => {
     const a = ARCHETYPES[id];
@@ -218,6 +218,8 @@ function renderCases() {
 
 /* ---------- dialog trainer ---------- */
 
+const isPhone = () => window.matchMedia('(max-width: 560px)').matches;
+
 let dialog = null;
 let startToken = 0;
 /** Scene chosen before the dialog starts; personaId null = hidden random persona. */
@@ -304,14 +306,18 @@ function renderDialog(personaId) {
   send.disabled = waiting;
 
   const userTurns = dialog.messages.filter((m) => m.role === 'user').length;
-  const locked = userTurns < 3 || dialog.busy || dialog.done;
-  const finish = dialog.known
+  const left = Math.max(0, 3 - userTurns);
+  const locked = left > 0 || dialog.busy || dialog.done;
+  // Until three replies are in, a one-line hint instead of nine disabled buttons keeps the focus on the conversation.
+  const finish = left > 0
+    ? h('p', { class: 'guess-hint', text: `Ещё ${left} ${left === 1 ? 'реплика' : 'реплики'} — и можно ${dialog.known ? 'получить разбор' : 'угадать архетип'}` })
+    : dialog.known
     ? h('div', { class: 'guess' }, [
-      h('h3', { text: userTurns < 3 ? 'Сделайте хотя бы 3 реплики, затем получите разбор' : 'Готовы к разбору?' }),
+      h('h3', { text: 'Готовы к разбору?' }),
       h('button', { class: 'btn btn-ghost', text: 'Получить разбор', on: { click: () => finishDialog(persona.personaId) }, attrs: locked ? { disabled: '' } : {} }),
     ])
     : h('div', { class: 'guess' }, [
-      h('h3', { text: userTurns < 3 ? 'Сделайте хотя бы 3 реплики, затем угадайте архетип' : 'Кто перед вами?' }),
+      h('h3', { text: 'Кто перед вами?' }),
       h('div', { class: 'chips' }, ARCHETYPE_IDS.map((id) => h('button', {
         class: 'chip',
         text: chip(id),
@@ -331,12 +337,17 @@ function renderDialog(personaId) {
     ]),
     h('p', { class: 'scene-line', text: SCENARIOS[dialog.scenario].intros[dialog.intro].text }),
     chat,
-    h('div', { class: 'composer' }, [input, send]),
     dialog.error && h('p', { class: 'error', text: dialog.error }),
     dialog.result ? renderDebrief(dialog.result) : finish,
+    // Last, so on phones it sits pinned above the bottom tab bar.
+    !dialog.done && h('div', { class: 'composer' }, [input, send]),
   );
   chat.scrollTop = chat.scrollHeight;
-  if (!input.disabled) input.focus();
+  if (isPhone()) {
+    if (!dialog.result) window.scrollTo({ top: document.documentElement.scrollHeight });
+  } else if (!input.disabled) {
+    input.focus(); // on phones this would pop the keyboard after every reply
+  }
 }
 
 async function sendMessage(raw) {
