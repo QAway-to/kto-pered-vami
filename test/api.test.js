@@ -31,6 +31,26 @@ test('GET /healthz and static index', async () => {
   assert.match(res.headers['content-security-policy'], /frame-ancestors/);
 });
 
+test('GET archetype direct pages and aliases with open graph metadata', async () => {
+  const app = createApp({ llm: null });
+  const resShizo = await request(app).get('/shizo').expect(200);
+  assert.match(resShizo.text, /Шизоидный тип/);
+  assert.match(resShizo.text, /og:image/);
+  assert.match(resShizo.text, /\/img\/archetypes\/schizoid\.webp/);
+
+  const resSchizoid = await request(app).get('/schizoid').expect(200);
+  assert.match(resSchizoid.text, /Шизоидный тип/);
+
+  const resType = await request(app).get('/type/schizoid').expect(200);
+  assert.match(resType.text, /Шизоидный тип/);
+
+  const resDark = await request(app).get('/dark-empath').expect(200);
+  assert.match(resDark.text, /Тёмный эмпат/);
+
+  const resTest = await request(app).get('/test').expect(200);
+  assert.match(resTest.text, /Кто перед вами/);
+});
+
 test('GET /api/persona/random returns a public persona without system prompt', async () => {
   const res = await request(createApp({ llm: null })).get('/api/persona/random').expect(200);
   assert.equal(res.body.success, true);

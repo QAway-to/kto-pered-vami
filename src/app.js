@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -11,7 +12,7 @@ import { scoreInstruction, parseScores } from './skill.js';
 import {
   validateLabRequest, nextSpeaker, labSystem, labMessages, verdictPrompt, parseVerdict, MAX_LINE_CHARS,
 } from './lab.js';
-import { ARCHETYPES, ARCHETYPE_IDS } from '../public/js/archetypes.js';
+import { ARCHETYPES, ARCHETYPE_IDS, ARCHETYPE_SLUGS } from '../public/js/archetypes.js';
 import { createAuth, createGate, authRouter, webhookGuard, telegramWebhook } from './auth-routes.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -286,6 +287,62 @@ ${formatTranscript(parsed.value, persona.name)}
 
   app.use('/api', api);
   app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
+
+  function escapeHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  let cachedIndexHtml = null;
+  function getIndexHtml() {
+    if (!cachedIndexHtml || process.env.NODE_ENV !== 'production') {
+      cachedIndexHtml = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf-8');
+    }
+    return cachedIndexHtml;
+  }
+
+  function sendArchetypeHtml(res, a, archetypeId) {
+    const baseHtml = getIndexHtml();
+    const title = `${escapeHtml(a.name)} — Кто перед вами?`;
+    const desc = escapeHtml(a.tagline);
+    const ogImage = `/img/archetypes/${archetypeId}.webp`;
+
+    const html = baseHtml
+      .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+      .replace(
+        /<meta\s+name="description"\s+content="[^"]*">/,
+        `<meta name="description" content="${desc}">\n  <meta property="og:title" content="${title}">\n  <meta property="og:description" content="${desc}">\n  <meta property="og:image" content="${ogImage}">\n  <meta property="og:type" content="article">`
+      );
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  }
+
+  // Direct archetype routes and SPA fallback for HTML navigation
+  app.get('*', (req, res, next) => {
+    if (req.method !== 'GET' || !req.accepts('html')) return next();
+
+    let rawPath = '';
+    try {
+      rawPath = decodeURIComponent(req.path).replace(/^\/+|\/+$/g, '').toLowerCase();
+    } catch {
+      rawPath = req.path.replace(/^\/+|\/+$/g, '').toLowerCase();
+    }
+
+    const typeMatch = rawPath.match(/^(?:type|t)\/([^/]+)$/);
+    const slug = typeMatch ? typeMatch[1] : rawPath;
+    const archetypeId = ARCHETYPE_SLUGS[slug];
+
+    if (archetypeId && ARCHETYPES[archetypeId]) {
+      return sendArchetypeHtml(res, ARCHETYPES[archetypeId], archetypeId);
+    }
+
+    return res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+  });
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, _next) => {

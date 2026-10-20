@@ -224,6 +224,38 @@ export const ARCHETYPES = {
 
 export const ARCHETYPE_IDS = Object.freeze(Object.keys(ARCHETYPES));
 
+export const ARCHETYPE_SLUGS = Object.freeze({
+  'dark-empath': 'dark-empath',
+  'dark': 'dark-empath',
+  'grandiose-narcissist': 'grandiose-narcissist',
+  'narcissist': 'grandiose-narcissist',
+  'vulnerable-narcissist': 'vulnerable-narcissist',
+  'covert': 'vulnerable-narcissist',
+  'covert-narcissist': 'vulnerable-narcissist',
+  'machiavellian': 'machiavellian',
+  'machiavelli': 'machiavellian',
+  'psychopath': 'psychopath',
+  'psycho': 'psychopath',
+  'hsp': 'hsp',
+  'sensitive': 'hsp',
+  'anxious-preoccupied': 'anxious-preoccupied',
+  'anxious': 'anxious-preoccupied',
+  'avoidant': 'avoidant',
+  'avoid': 'avoidant',
+  'borderline': 'borderline',
+  'bpd': 'borderline',
+  'schizoid': 'schizoid',
+  'shizo': 'schizoid',
+  'shizoid': 'schizoid',
+  // Cyrillic aliases
+  'шизоид': 'schizoid',
+  'шизо': 'schizoid',
+  'нарцисс': 'grandiose-narcissist',
+  'эмпат': 'dark-empath',
+  'макиавелли': 'machiavellian',
+  'психопат': 'psychopath',
+});
+
 // Add an id here once /img/archetypes/<id>.webp exists; until then the card shows a monogram placeholder.
 export const IMAGES_READY = new Set(ARCHETYPE_IDS);
 

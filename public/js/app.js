@@ -1,4 +1,4 @@
-import { ARCHETYPES, ARCHETYPE_IDS, TRAIT_DEFINITIONS, TRAIT_KEYS } from './archetypes.js';
+import { ARCHETYPES, ARCHETYPE_IDS, ARCHETYPE_SLUGS, TRAIT_DEFINITIONS, TRAIT_KEYS } from './archetypes.js';
 import { QUESTIONS, LIKERT, DIMENSIONS, DIM_KEYS, scoreDimensions, rankArchetypes } from './quiz.js';
 import { CASES } from './cases.js';
 import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech, isAuthError } from './ui.js';
@@ -39,12 +39,75 @@ const renderers = {
   home: renderHome, type: renderType, test: renderTest, cases: renderCases, dialog: renderDialog, lab: renderLab,
 };
 
-function go(tab, arg) {
+function urlFor(tab, arg) {
+  if (tab === 'home') return '/';
+  if (tab === 'type' && arg) return `/${arg}`;
+  if (arg) return `/${tab}/${arg}`;
+  return `/${tab}`;
+}
+
+function routeFromLocation() {
+  let path = '';
+  try {
+    path = decodeURIComponent(window.location.pathname).replace(/^\/+|\/+$/g, '').toLowerCase();
+  } catch {
+    path = window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+  }
+  if (!path) return { tab: 'home' };
+
+  if (ARCHETYPE_SLUGS[path]) {
+    return { tab: 'type', arg: ARCHETYPE_SLUGS[path] };
+  }
+
+  const typeMatch = path.match(/^(?:type|t)\/([^/]+)$/);
+  if (typeMatch && ARCHETYPE_SLUGS[typeMatch[1]]) {
+    return { tab: 'type', arg: ARCHETYPE_SLUGS[typeMatch[1]] };
+  }
+
+  const [tab, sub] = path.split('/');
+  if (tab in renderers && tab !== 'home') {
+    const arg = sub && ARCHETYPE_SLUGS[sub] ? ARCHETYPE_SLUGS[sub] : sub;
+    return { tab, arg };
+  }
+
+  return { tab: 'home' };
+}
+
+function go(tab, arg, push = true) {
+  if (!renderers[tab]) tab = 'home';
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.tab === tab));
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('is-active', v.id === `view-${tab}`));
+
+  if (push && typeof window !== 'undefined' && window.history?.pushState) {
+    const targetUrl = urlFor(tab, arg);
+    if (window.location.pathname !== targetUrl) {
+      window.history.pushState({ tab, arg }, '', targetUrl);
+    }
+  }
+
+  if (tab === 'type' && arg && ARCHETYPES[arg]) {
+    document.title = `${ARCHETYPES[arg].name} — Кто перед вами?`;
+  } else {
+    document.title = '10 психологических архетипов — Кто перед вами?';
+  }
+
+  if (tg?.BackButton) {
+    if (tab === 'home') {
+      tg.BackButton.hide();
+    } else {
+      tg.BackButton.show();
+      tg.BackButton.onClick(() => go('home'));
+    }
+  }
+
   renderers[tab](arg);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+window.addEventListener('popstate', (e) => {
+  const route = e.state || routeFromLocation();
+  go(route.tab, route.arg, false);
+});
 
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.tab)));
 document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
@@ -548,5 +611,6 @@ function renderDebrief(result) {
 }
 
 track('app_opened');
-renderHome();
+const bootRoute = routeFromLocation();
+go(bootRoute.tab, bootRoute.arg, false);
 initAuth();

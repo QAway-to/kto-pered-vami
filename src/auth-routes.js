@@ -218,6 +218,12 @@ async function handleUpdate(auth, update, log) {
     return;
   }
   const msg = update.message;
+  // "/chatid" in a group or channel answers with the chat ID for TELEGRAM_CHAT_ID (works when the bot is already an admin).
+  if (msg && ['group', 'supergroup', 'channel'].includes(msg.chat?.type) && /^\/chatid(@\w+)?$/.test(msg.text ?? '')) {
+    log.info(`Chat ID requested in "${msg.chat.title}" id=${msg.chat.id}`);
+    await bot.sendMessage(msg.chat.id, `ID этого чата: ${msg.chat.id}\nУкажите его в Render как TELEGRAM_CHAT_ID.`);
+    return;
+  }
   if (msg && msg.chat?.type === 'private' && typeof msg.text === 'string') {
     const login = msg.text.match(LOGIN_PAYLOAD);
     if (login) {

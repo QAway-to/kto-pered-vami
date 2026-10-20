@@ -338,3 +338,14 @@ test('bot tells the admin the chat ID when added to a channel', async () => {
   assert.match(dm[2], /-1001234567890/);
   assert.match(dm[2], /TELEGRAM_CHAT_ID/);
 });
+
+test('/chatid in a group replies with the chat ID', async () => {
+  const { app, bot } = telegramApp();
+  await request(app).post('/api/telegram/webhook').set('X-Telegram-Bot-Api-Secret-Token', deriveWebhookSecret(SECRET)).send({
+    message: { chat: { id: -1009876543210, type: 'supergroup', title: 'Club' }, from: alice, text: '/chatid@kto_bot' },
+  }).expect(200);
+  await new Promise((r) => setImmediate(r));
+  const reply = bot.calls.find((c) => c[0] === 'sendMessage');
+  assert.equal(reply[1], -1009876543210);
+  assert.match(reply[2], /-1009876543210/);
+});
