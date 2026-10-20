@@ -4,7 +4,7 @@ import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { PERSONAS } from '../src/personas.js';
 import { ARCHETYPE_IDS } from '../public/js/archetypes.js';
-import { LAB_TURNS, SCENARIOS, SCENARIO_IDS, MOTIVES, PERSONA_NAMES } from '../public/js/lab-data.js';
+import { LAB_TURNS, SCENARIOS, SCENARIO_IDS, MOTIVES, PERSONA_NAMES, DOMINANTS } from '../public/js/lab-data.js';
 import {
   validateLabRequest, nextSpeaker, labSystem, labMessages, verdictPrompt, parseVerdict,
 } from '../src/lab.js';
@@ -27,6 +27,7 @@ const verdictJson = JSON.stringify({
 test('lab data covers every archetype and matches persona names', () => {
   for (const id of ARCHETYPE_IDS) {
     assert.ok(MOTIVES[id], `motive for ${id}`);
+    assert.ok(DOMINANTS[id], `dominant for ${id}`);
     assert.equal(PERSONA_NAMES[id], PERSONAS[id].name, `name for ${id}`);
   }
   assert.equal(SCENARIO_IDS[0], 'first-meeting');
