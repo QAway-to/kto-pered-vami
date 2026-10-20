@@ -121,7 +121,7 @@ export const PERSONA_NAMES = {
   hsp: 'Соня',
   secure: 'Марина',
   schizoid: 'Глеб',
-  'control-freak': 'Вадим',
+  'control-freak': 'Инга',
 };
 
 /** Random intro index for a scenario, different from `current` when there is a choice. */
