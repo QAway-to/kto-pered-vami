@@ -315,6 +315,8 @@ h3 { font: 600 17px/1.35 var(--sans); color: var(--ink); margin: 4px 0 8px; text
 .chip:disabled { opacity: .5; cursor: not-allowed; }
 .debrief { margin-top: 20px; }
 .debrief .row { margin-top: 16px; }
+.skill { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--hairline); }
+.skill .bars { margin: 12px 0; }
 .explain .row { margin-top: 12px; }
 
 @media (max-width: 560px) {

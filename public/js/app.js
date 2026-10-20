@@ -5,6 +5,17 @@ import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, form
 import { SCENARIO_IDS, SCENARIOS, randomIntro } from './lab-data.js';
 import { renderLab } from './lab-ui.js';
 import { track } from './track.js';
+import { SKILL_AXES, SKILL_KEYS, overall, level } from './skill.js';
+
+const SPAR_HISTORY_KEY = 'spar-history';
+const SPAR_HISTORY_LIMIT = 100;
+
+/** Scored sparrings, newest first; entries with a stale shape are dropped. */
+function loadSparHistory() {
+  const list = store.get(SPAR_HISTORY_KEY, []);
+  const isScore = (v) => typeof v === 'number' && v >= 0 && v <= 10;
+  return Array.isArray(list) ? list.filter((e) => SKILL_KEYS.every((k) => isScore(e?.scores?.[k]))) : [];
+}
 
 /** Saved test result, or null if missing or made with archetypes that no longer exist. */
 function loadResult() {
@@ -43,11 +54,13 @@ function renderHome() {
   const my = loadResult();
   const cases = store.get('cases', { right: 0, total: 0 });
   const dialogs = store.get('dialogs', { right: 0, total: 0 });
+  const skill = level(loadSparHistory());
   mount(
     'stats',
     h('span', { class: 'pill', text: my ? `Вам ближе: ${chip(my.ranked[0].id)}` : 'Тест ещё не пройден' }),
     h('span', { class: 'pill', text: `Красные флаги: ${cases.right}/${cases.total}` }),
     h('span', { class: 'pill', text: `Спарринг: ${dialogs.right}/${dialogs.total}` }),
+    skill != null && h('span', { class: 'pill pill-accent', text: `Навык: ${skill}/10` }),
   );
   mount('archetype-grid', ...ARCHETYPE_IDS.map((id) => {
     const a = ARCHETYPES[id];
@@ -392,6 +405,12 @@ async function finishDialog(guessId) {
       const stats = store.get('dialogs', { right: 0, total: 0 });
       store.set('dialogs', { right: stats.right + (result.correct ? 1 : 0), total: stats.total + 1 });
     }
+    const history = loadSparHistory();
+    const levelBefore = level(history);
+    if (result.scores) {
+      const entry = { at: Date.now(), archetype: result.actual, known: current.known, correct: result.correct, scores: result.scores };
+      store.set(SPAR_HISTORY_KEY, [entry, ...history].slice(0, SPAR_HISTORY_LIMIT));
+    }
     track('spar_completed', {
       known: current.known,
       correct: result.correct,
@@ -400,12 +419,30 @@ async function finishDialog(guessId) {
       scenario: current.scenario,
       turns: current.messages.filter((m) => m.role === 'user').length,
     });
-    dialog = { ...dialog, busy: false, done: true, result };
+    dialog = { ...dialog, busy: false, done: true, result, levelBefore };
   } catch (err) {
     if (dialog !== current) return;
     dialog = { ...dialog, busy: false, error: err.message };
   }
   renderDialog();
+}
+
+/** Scores of this sparring and how they moved the running level. */
+function skillView(scores, levelBefore) {
+  const levelNow = level(loadSparHistory());
+  const delta = levelBefore == null ? null : Math.round((levelNow - levelBefore) * 10) / 10;
+  const trend = delta == null
+    ? 'Первая оценка — дальше будет видно, как растёт навык.'
+    : `Ваш уровень: ${levelBefore} → ${levelNow}${delta > 0 ? ` (+${delta})` : delta < 0 ? ` (${delta})` : ''}`;
+  return h('div', { class: 'skill' }, [
+    h('span', { class: 'eyebrow', text: `Навык в этой сцене · ${overall(scores)}/10` }),
+    h('div', { class: 'bars' }, SKILL_KEYS.map((k) => h('div', { class: 'bar' }, [
+      h('span', { text: SKILL_AXES[k].label }),
+      h('div', { class: 'bar-track' }, [h('div', { class: 'bar-fill', vars: { width: `${scores[k] * 10}%`, '--c': 'var(--primary)' } })]),
+      h('span', { class: 'muted', text: `${scores[k]}/10` }),
+    ]))),
+    h('p', { class: 'muted small', text: trend }),
+  ]);
 }
 
 function renderDebrief(result) {
@@ -415,6 +452,7 @@ function renderDebrief(result) {
     h('span', { class: 'eyebrow', text: verdict }),
     h('h3', { text: `${dialog.persona.name} — ${chip(result.actual)}` }),
     h('p', { class: 'feedback', text: result.feedback }),
+    result.scores && skillView(result.scores, dialog.levelBefore),
     h('div', { class: 'row' }, [
       h('button', { class: 'btn btn-primary', text: 'Новая сцена', on: { click: () => { dialog = null; setup = { ...setup, intro: randomIntro(setup.scenario, setup.intro) }; renderSetup(); } } }),
       h('button', { class: 'btn btn-ghost', text: `Об архетипе «${a.name}»`, on: { click: () => go('type', result.actual) } }),
