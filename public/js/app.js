@@ -4,6 +4,7 @@ import { CASES } from './cases.js';
 import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech } from './ui.js';
 import { SCENARIO_IDS, SCENARIOS, randomIntro } from './lab-data.js';
 import { renderLab } from './lab-ui.js';
+import { track } from './track.js';
 
 /** Saved test result, or null if missing or made with archetypes that no longer exist. */
 function loadResult() {
@@ -70,6 +71,7 @@ function list(items) {
 
 function renderType(id) {
   const a = ARCHETYPES[id];
+  track('archetype_viewed', { archetype: id });
   mount(
     'type-body',
     h('button', { class: 'back', text: '← Все архетипы', on: { click: () => go('home') } }),
@@ -106,6 +108,7 @@ function renderTest() {
     const saved = loadResult();
     if (saved) return renderTestResult(saved);
     testState = { i: 0, answers: [] };
+    track('test_started');
   }
   const { i } = testState;
   const q = QUESTIONS[i];
@@ -129,6 +132,7 @@ function answerTest(value) {
   const dims = scoreDimensions(testState.answers);
   const result = { dims, ranked: rankArchetypes(dims) };
   store.set('result', result);
+  track('test_completed', { archetype: result.ranked[0].id });
   testState = null;
   return renderTestResult(result);
 }
@@ -193,6 +197,7 @@ function renderCases() {
       else if (options[idx] === id) b.classList.add('is-wrong');
     });
     store.set('cases', { right: score.right + (isRight ? 1 : 0), total: score.total + 1 });
+    track('case_answered', { correct: isRight, archetype: c.answer });
     explain.replaceChildren(h('div', { class: 'explain' }, [
       h('h3', { text: isRight ? 'Верно!' : `Это ${chip(c.answer)}` }),
       h('p', { class: 'explain-why' }, formatSpeech(c.why)),
@@ -237,6 +242,7 @@ async function startDialog() {
     const p = await api(`/persona/${personaId ?? 'random'}`);
     if (token !== startToken) return; // a newer dialog was started meanwhile
     dialog = { persona: p, known: Boolean(personaId), scenario, intro, messages: [], busy: true, done: false };
+    track('spar_started', { known: dialog.known, scenario, archetype: p.personaId });
     renderDialog();
     const current = dialog;
     const { reply } = await api('/chat', { personaId: p.personaId, ...sceneOf(current), messages: [] });
@@ -386,6 +392,14 @@ async function finishDialog(guessId) {
       const stats = store.get('dialogs', { right: 0, total: 0 });
       store.set('dialogs', { right: stats.right + (result.correct ? 1 : 0), total: stats.total + 1 });
     }
+    track('spar_completed', {
+      known: current.known,
+      correct: result.correct,
+      archetype: result.actual,
+      guess: guessId,
+      scenario: current.scenario,
+      turns: current.messages.filter((m) => m.role === 'user').length,
+    });
     dialog = { ...dialog, busy: false, done: true, result };
   } catch (err) {
     if (dialog !== current) return;
@@ -408,4 +422,5 @@ function renderDebrief(result) {
   ]);
 }
 
+track('app_opened');
 renderHome();

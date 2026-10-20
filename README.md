@@ -51,6 +51,22 @@ npm test
 2. Ввести `DEEPSEEK_API_KEY`. Поле `ANTHROPIC_API_KEY` пока оставить пустым.
 3. Поставить лимит трат у провайдера. `AI_CALLS_PER_HOUR` (по умолчанию 300) — общий лимит ИИ-запросов в час на сервер.
 
+## Аналитика (PostHog)
+
+Браузер шлёт события на `/api/track`, сервер пересылает их в PostHog. Через прокси события не режут блокировщики рекламы, а тексты диалогов в аналитику не попадают никогда: сервер пропускает только события и свойства из белого списка (`src/analytics.js`).
+
+1. Зарегистрироваться на [eu.posthog.com](https://eu.posthog.com) и скопировать Project API key (`phc_...`).
+2. Задать `POSTHOG_KEY` в Render. Без ключа аналитика выключена, остальное работает.
+3. В PostHog → Settings → Project включить **Discard client IP data**: страна определится, а сам IP не сохранится.
+
+**Воронка:** `app_opened` → `test_started` → `test_completed` → `spar_started` → `spar_completed`. Дополнительно: `archetype_viewed`, `case_answered`, `lab_started`, `lab_completed`.
+
+**Источник трафика** (запоминается первое касание, в PostHog это `initial_source` / `initial_campaign`):
+- веб: `https://…/?utm_source=tiktok&utm_campaign=reels1`;
+- Telegram: `https://t.me/<bot>/<app>?startapp=tiktok_reels1` (формат `<источник>_<кампания>`).
+
+Для каждого рекламного канала и креатива нужна своя ссылка, тогда CAC считается по каналам.
+
 ## Telegram Mini App
 
 @BotFather → `/newapp` (или `/setmenubutton`) → указать URL сервиса на Render. Тема (светлая или тёмная) подхватывается из Telegram.

@@ -6,6 +6,7 @@ import { PERSONAS, PERSONA_IDS, publicPersona, trainerSystem } from './personas.
 import { isScene, sceneCue, sceneSummary } from './scene.js';
 import { validateMessages, isPersonaId, MAX_ASSISTANT_CHARS } from './validate.js';
 import { createRateLimiter } from './rateLimit.js';
+import { validateTrack } from './analytics.js';
 import {
   validateLabRequest, nextSpeaker, labSystem, labMessages, verdictPrompt, parseVerdict, MAX_LINE_CHARS,
 } from './lab.js';
@@ -81,12 +82,13 @@ function parseTranscript(messages, opts) {
 }
 
 /**
- * @param {{llm: import('./llm.js').LlmProvider|null, rateLimit?: {windowMs: number, max: number}, labRateLimit?: {windowMs: number, max: number}, aiCallsPerHour?: number}} deps
+ * @param {{llm: import('./llm.js').LlmProvider|null, analytics?: ReturnType<typeof import('./analytics.js').createAnalytics>, rateLimit?: {windowMs: number, max: number}, labRateLimit?: {windowMs: number, max: number}, trackRateLimit?: {windowMs: number, max: number}, aiCallsPerHour?: number}} deps
  * One lab experiment is 11 AI calls in about a minute, so the default per-IP limit leaves room for that.
  * @returns {import('express').Express}
  */
 export function createApp({
-  llm, rateLimit = { windowMs: 60_000, max: 40 }, labRateLimit = { windowMs: 600_000, max: 45 }, aiCallsPerHour = 300,
+  llm, analytics = null, rateLimit = { windowMs: 60_000, max: 40 }, labRateLimit = { windowMs: 600_000, max: 45 },
+  trackRateLimit = { windowMs: 60_000, max: 120 }, aiCallsPerHour = 300,
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -100,6 +102,19 @@ export function createApp({
   });
 
   app.get('/healthz', (req, res) => res.json(ok({ status: 'ok' })));
+
+  // Analytics has its own limiter and body cap so tracking never eats into the chat budget.
+  app.post(
+    '/api/track',
+    createRateLimiter({ ...trackRateLimit, message: 'Слишком много событий' }),
+    express.json({ limit: '4kb' }),
+    (req, res) => {
+      const parsed = validateTrack(req.body);
+      if (!parsed.ok) return res.status(400).json(fail(parsed.error));
+      if (analytics) analytics.capture({ ...parsed.value, ip: req.ip }); // fire-and-forget; capture never throws
+      return res.status(204).end();
+    },
+  );
 
   const api = express.Router();
   api.use(createRateLimiter(rateLimit)); // before body parsing so blocked clients cost nothing

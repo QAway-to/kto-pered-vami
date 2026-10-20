@@ -3,6 +3,7 @@
 import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
 import { LAB_TURNS, SCENARIO_IDS, MOTIVES, OUTCOMES, PERSONA_NAMES, DOMINANTS, randomIntro } from './lab-data.js';
 import { h, mount, store, api, media, sceneChips, introCard } from './ui.js';
+import { track } from './track.js';
 
 const HISTORY_KEY = 'lab-history';
 const HISTORY_LIMIT = 200;
@@ -137,6 +138,7 @@ async function runExperiment(resume = false) {
   const token = (runToken += 1);
   stickToBottom = true;
   const transcript = resume && state.run ? state.run.transcript : [];
+  if (!resume) track('lab_started', { a, b, scenario });
   setState({ run: { transcript, status: 'running', typing: true, streaming: false, verdict: null, error: null } });
 
   try {
@@ -176,6 +178,7 @@ async function runExperiment(resume = false) {
     if (token !== runToken) return;
 
     saveResult({ a, b, scenario, verdict });
+    track('lab_completed', { a, b, scenario, winner: { a, b }[verdict.winner] ?? 'draw' });
     setState({ run: { ...state.run, status: 'done', typing: false, streaming: false, verdict } });
   } catch (err) {
     if (token !== runToken) return;
