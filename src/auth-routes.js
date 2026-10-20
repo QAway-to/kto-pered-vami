@@ -189,15 +189,34 @@ export function telegramWebhook(auth, { log = console } = {}) {
     if (auth.mode !== 'telegram') return res.status(404).end();
     res.status(200).end();
     try {
-      await handleUpdate(auth, req.body ?? {});
+      await handleUpdate(auth, req.body ?? {}, log);
     } catch (err) {
       log.error(`Telegram update failed: ${err.message}`);
     }
   };
 }
 
-async function handleUpdate(auth, update) {
+async function handleUpdate(auth, update, log) {
   const { bot } = auth;
+
+  // The bot was added to (or promoted in) a channel or group: tell the person who did it the chat ID for Render.
+  const added = update.my_chat_member;
+  if (added && ['channel', 'supergroup', 'group'].includes(added.chat?.type)) {
+    const status = added.new_chat_member?.status;
+    if (status === 'administrator' || status === 'member') {
+      const { id, title } = added.chat;
+      log.info(`Bot is ${status} in ${added.chat.type} "${title}" id=${id}`);
+      const hint = status === 'administrator'
+        ? 'Подставьте его в Render как TELEGRAM_CHAT_ID.'
+        : 'Сделайте бота администратором — без этого Telegram не покажет ему участников.';
+      try {
+        await bot.sendMessage(added.from.id, `Бот добавлен в «${title}».\nID чата: ${id}\n\n${hint}`);
+      } catch (err) {
+        log.error(`Could not DM the chat ID: ${err.message}`); // the admin never pressed Start in the bot
+      }
+    }
+    return;
+  }
   const msg = update.message;
   if (msg && msg.chat?.type === 'private' && typeof msg.text === 'string') {
     const login = msg.text.match(LOGIN_PAYLOAD);

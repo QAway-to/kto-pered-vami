@@ -321,3 +321,20 @@ test('deviceLabel names common browsers and systems', async () => {
   assert.equal(deviceLabel('Mozilla/5.0 (Linux; Android 14) Chrome/130.0 Mobile Safari/537.36 YaBrowser/24.1'), 'Яндекс Браузер, Android');
   assert.equal(deviceLabel(undefined), 'неизвестное устройство');
 });
+
+test('bot tells the admin the chat ID when added to a channel', async () => {
+  const { app, bot } = telegramApp();
+  const secret = deriveWebhookSecret(SECRET);
+  await request(app).post('/api/telegram/webhook').set('X-Telegram-Bot-Api-Secret-Token', secret).send({
+    my_chat_member: {
+      chat: { id: -1001234567890, type: 'channel', title: 'Sadovsky Club' },
+      from: alice,
+      new_chat_member: { status: 'administrator', user: { id: 1, is_bot: true } },
+    },
+  }).expect(200);
+  await new Promise((r) => setImmediate(r));
+  const dm = bot.calls.find((c) => c[0] === 'sendMessage');
+  assert.equal(dm[1], alice.id);
+  assert.match(dm[2], /-1001234567890/);
+  assert.match(dm[2], /TELEGRAM_CHAT_ID/);
+});

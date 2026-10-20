@@ -92,7 +92,7 @@ export function createBotApi({ token, fetchImpl = fetch, timeoutMs = 10_000 }) {
     sendMessage: (chatId, text, extra = {}) => call('sendMessage', { chat_id: chatId, text, ...extra }),
     answerCallbackQuery: (id, text) => call('answerCallbackQuery', { callback_query_id: id, text }),
     setWebhook: (url, secretToken) => call('setWebhook', {
-      url, secret_token: secretToken, allowed_updates: ['message', 'callback_query'], drop_pending_updates: true,
+      url, secret_token: secretToken, allowed_updates: ['message', 'callback_query', 'my_chat_member'], drop_pending_updates: true,
     }),
   };
 }
