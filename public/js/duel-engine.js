@@ -52,7 +52,7 @@ export function styleOf(x) {
 export function makeProfile(core, { mix = null, share = MIX.default } = {}) {
   if (!PROFILES[core]) throw new RangeError('Unknown archetype');
   if (mix !== null && (!PROFILES[mix] || mix === core)) throw new RangeError('Unknown admixture');
-  const w = mix ? Math.min(MIX.max, Math.max(MIX.min, share)) : 0;
+  const w = mix ? Math.min(MIX.max, Math.max(MIX.min, Number.isFinite(share) ? share : MIX.default)) : 0;
   const axes = Object.fromEntries(AXIS_KEYS.map((k) => [
     k, Math.round(((1 - w) * PROFILES[core][k] + w * (mix ? PROFILES[mix][k] : 0)) * 10) / 10,
   ]));

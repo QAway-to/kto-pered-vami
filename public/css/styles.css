@@ -984,7 +984,7 @@ p, li, .lead, .msg, .arch-tagline, .slot-motive, .note, .feedback {
 .duel-mix p { margin: 0; }
 .duel-mix-select { width: 100%; min-height: 36px; padding: 6px 8px; border-radius: var(--r-md, 10px); border: 1px solid var(--hairline); background: var(--surface-soft); color: var(--ink); font: inherit; font-size: 13px; }
 .duel-mix-shares { display: flex; gap: 6px; flex-wrap: wrap; }
-.duel-mix-shares .chip { padding: 4px 10px; font-size: 12px; }
+.duel-mix-shares .chip { min-height: 30px; min-width: 0; padding: 2px 10px; font-size: 12px; }
 .duel-mix-note { margin: 0 0 12px; }
 .duel-axes { display: grid; gap: 3px; margin-top: 2px; }
 .duel-axis { display: grid; grid-template-columns: minmax(0, 1fr) 56px 14px; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); }

@@ -33,6 +33,7 @@ function setState(patch) {
 }
 
 const mixKey = (side) => (side === 'a' ? 'mixA' : 'mixB');
+const NO_MIX = Object.freeze({ mix: '', share: MIX.default });
 
 /* ---------- history ---------- */
 
@@ -122,13 +123,14 @@ function skip() {
 function pick(id) {
   if (state.run && !state.run.done) return;
   if (state.a === id || state.b === id) return;
-  if (!state.a) setState({ a: id, run: null });
-  else setState({ b: id, run: null });
+  // A new core starts without an admixture: the old one may even be the new core itself.
+  if (!state.a) setState({ a: id, mixA: NO_MIX, run: null });
+  else setState({ b: id, mixB: NO_MIX, run: null });
 }
 
 function clearSlot(slot) {
   if (state.run && !state.run.done) return;
-  setState({ [slot]: null, [mixKey(slot)]: { mix: '', share: MIX.default }, run: null });
+  setState({ [slot]: null, [mixKey(slot)]: NO_MIX, run: null });
 }
 
 function swap() {
@@ -437,7 +439,7 @@ function matrixView() {
         class: `cell ${cls}`,
         text: r ? OUTCOMES[r.outcome].label.slice(0, 1) : '',
         attrs: { title: `${ARCHETYPES[rowId].name} vs ${ARCHETYPES[colId].name}${r ? `: ${OUTCOMES[r.outcome].label}` : ''}` },
-        on: { click: () => { if (!state.run || state.run.done) setState({ a: rowId, b: colId, run: null }); } },
+        on: { click: () => { if (!state.run || state.run.done) setState({ a: rowId, b: colId, mixA: NO_MIX, mixB: NO_MIX, run: null }); } },
       });
     }),
   ]));
@@ -477,7 +479,7 @@ function render() {
 /** @param {string} [presetId] - archetype to put into slot A */
 export function renderDuel(presetId) {
   if (isArchetype(presetId) && (!state.run || state.run.done)) {
-    state = { ...state, a: presetId, b: state.b === presetId ? null : state.b, run: null };
+    state = { ...state, a: presetId, mixA: NO_MIX, ...(state.b === presetId ? { b: null, mixB: NO_MIX } : {}), run: null };
   }
   render();
 }
