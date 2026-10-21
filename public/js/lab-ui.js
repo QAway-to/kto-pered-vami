@@ -1,8 +1,10 @@
-// Lab UI: drag two archetypes into the arena, watch them talk, get a game-theory verdict, build a "who beats whom" matrix.
+// Lab UI: drag two characters into the arena (each with an attachment style), watch them talk, get a game-theory verdict,
+// build a "who beats whom" matrix.
 
-import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
+import { ARCHETYPES, CHARACTER_IDS, ATTACHMENT_IDS, attachmentLabel } from './archetypes.js';
+import { typicalAttachment } from './duel-engine.js';
 import { LAB_TURNS, SCENARIO_IDS, MOTIVES, OUTCOMES, PERSONA_NAMES, DOMINANTS, randomIntro } from './lab-data.js';
-import { h, mount, store, api, media, sceneChips, introCard } from './ui.js';
+import { h, mount, store, api, media, sceneChips, introCard, attachmentChips } from './ui.js';
 import { track } from './track.js';
 
 const HISTORY_KEY = 'lab-history';
@@ -73,10 +75,15 @@ function sleep(ms, token) {
   });
 }
 
-/** @type {{a: string|null, b: string|null, scenario: string, intro: number, run: any, speed: 'slow'|'normal'|'fast'}} */
+/**
+ * `a` / `b`: character patterns; `attA` / `attB`: their attachment styles ('' = the character's typical one).
+ * @type {{a: string|null, b: string|null, attA: string, attB: string, scenario: string, intro: number, run: any, speed: 'slow'|'normal'|'fast'}}
+ */
 let state = {
   a: null,
   b: null,
+  attA: '',
+  attB: '',
   scenario: SCENARIO_IDS[0],
   intro: randomIntro(SCENARIO_IDS[0]),
   run: null,
@@ -91,7 +98,10 @@ function setSpeed(speed) {
   }
 }
 
-const isArchetype = (id) => typeof id === 'string' && Object.hasOwn(ARCHETYPES, id);
+const isCharacter = (id) => CHARACTER_IDS.includes(id);
+const attKey = (slot) => (slot === 'a' ? 'attA' : 'attB');
+/** The slot's attachment style as sent to the server: the chosen one or the character's typical one. */
+const attachmentOf = (slot) => state[attKey(slot)] || typicalAttachment(state[slot]);
 let stickToBottom = true;
 
 const isRunning = () => state.run?.status === 'running' || state.run?.status === 'judging';
@@ -100,7 +110,7 @@ const firstName = (id) => PERSONA_NAMES[id] ?? ARCHETYPES[id].name;
 
 function loadHistory() {
   const list = store.get(HISTORY_KEY, []);
-  return Array.isArray(list) ? list.filter((r) => r && isArchetype(r.a) && isArchetype(r.b)) : [];
+  return Array.isArray(list) ? list.filter((r) => r && isCharacter(r.a) && isCharacter(r.b)) : [];
 }
 
 function setState(patch) {
@@ -112,9 +122,10 @@ function setState(patch) {
 
 function place(id, slot) {
   if (isRunning()) return;
+  if (state[slot] === id) return; // dropped back onto its own slot: keep the chosen attachment
   const other = slot === 'a' ? 'b' : 'a';
-  const patch = { [slot]: id, run: null };
-  if (state[other] === id) patch[other] = state[slot]; // dropping onto the other slot's character swaps them
+  const patch = { [slot]: id, [attKey(slot)]: '', run: null };
+  if (state[other] === id) Object.assign(patch, { [other]: state[slot], [attKey(other)]: state[attKey(slot)] }); // dropping onto the other slot's character swaps them
   setState(patch);
 }
 
@@ -127,7 +138,7 @@ function pick(id) {
 
 function swap() {
   if (isRunning()) return;
-  setState({ a: state.b, b: state.a, run: null });
+  setState({ a: state.b, b: state.a, attA: state.attB, attB: state.attA, run: null });
 }
 
 /* ---------- running ---------- */
@@ -135,6 +146,8 @@ function swap() {
 async function runExperiment(resume = false) {
   const { a, b, scenario, intro } = state;
   if (!a || !b || a === b) return;
+  const attA = attachmentOf('a');
+  const attB = attachmentOf('b');
   const token = (runToken += 1);
   stickToBottom = true;
   const transcript = resume && state.run ? state.run.transcript : [];
@@ -152,7 +165,7 @@ async function runExperiment(resume = false) {
       }
 
       setState({ run: { ...state.run, typing: true, streaming: false } });
-      const turnPromise = api('/lab/turn', { a, b, scenario, intro, transcript: lines, ticket: state.run?.ticket });
+      const turnPromise = api('/lab/turn', { a, b, attA, attB, scenario, intro, transcript: lines, ticket: state.run?.ticket });
       const typingWait = sleep(getTypingDelay(state.speed), token);
       const [{ speaker, text, ticket }] = await Promise.all([turnPromise, typingWait]);
       if (token !== runToken) return;
@@ -173,7 +186,7 @@ async function runExperiment(resume = false) {
     if (token !== runToken) return;
 
     setState({ run: { ...state.run, status: 'judging', typing: true, streaming: false } });
-    const verdictPromise = api('/lab/verdict', { a, b, scenario, intro, transcript: lines, ticket: state.run?.ticket });
+    const verdictPromise = api('/lab/verdict', { a, b, attA, attB, scenario, intro, transcript: lines, ticket: state.run?.ticket });
     const judgingWait = sleep(getJudgingDelay(state.speed), token);
     const [verdict] = await Promise.all([verdictPromise, judgingWait]);
     if (token !== runToken) return;
@@ -226,7 +239,7 @@ function slotView(slot) {
       drop: (e) => {
         e.preventDefault();
         const dropped = e.dataTransfer?.getData('text/plain');
-        if (isArchetype(dropped)) place(dropped, slot);
+        if (isCharacter(dropped)) place(dropped, slot);
       },
     },
   }, id
@@ -235,12 +248,19 @@ function slotView(slot) {
       h('div', { class: 'slot-body' }, [
         h('span', { class: 'eyebrow', text: label }),
         h('h3', { text: `${firstName(id)} · ${ARCHETYPES[id].name}` }),
+        h('p', { class: 'muted small slot-attachment', text: attachmentLabel(attachmentOf(slot)) }),
         DOMINANTS[id] && h('div', { class: 'slot-dominant', attrs: { title: DOMINANTS[id].focus } }, [
           h('span', { class: 'dominant-label', text: 'Доминанта:' }),
           h('span', { class: 'dominant-val', text: DOMINANTS[id].name }),
         ]),
         h('p', { class: 'slot-motive', text: `Хочет: ${MOTIVES[id]}` }),
-        !isRunning() && h('button', { class: 'back', text: 'Убрать', on: { click: () => setState({ [slot]: null, run: null }) } }),
+        attachmentChips({
+          typical: typicalAttachment(id),
+          value: state[attKey(slot)],
+          disabled: isRunning(),
+          onPick: (v) => setState({ [attKey(slot)]: v, run: null }),
+        }),
+        !isRunning() && h('button', { class: 'back', text: 'Убрать', on: { click: () => setState({ [slot]: null, [attKey(slot)]: '', run: null }) } }),
       ]),
     ]
     : [h('div', { class: 'slot-empty' }, [h('span', { class: 'eyebrow', text: label }), h('p', { text: 'Перетащите сюда персонажа или нажмите на него ниже' })])]);
@@ -248,7 +268,7 @@ function slotView(slot) {
 }
 
 function rosterView() {
-  return h('div', { class: 'roster' }, ARCHETYPE_IDS.map((id) => {
+  return h('div', { class: 'roster' }, CHARACTER_IDS.map((id) => {
     const taken = state.a === id || state.b === id;
     return h('button', {
       class: `roster-item ${taken ? 'is-taken' : ''}`,
@@ -429,10 +449,10 @@ function matrixView() {
   const latest = new Map();
   for (const r of history) if (!latest.has(`${r.a}|${r.b}`)) latest.set(`${r.a}|${r.b}`, r);
 
-  const head = h('tr', {}, [h('th', { text: 'A ↓  B →' }), ...ARCHETYPE_IDS.map((id) => h('th', { attrs: { title: ARCHETYPES[id].name } }, [media(id, 'media-xs')]))]);
-  const rows = ARCHETYPE_IDS.map((rowId) => h('tr', {}, [
+  const head = h('tr', {}, [h('th', { text: 'A ↓  B →' }), ...CHARACTER_IDS.map((id) => h('th', { attrs: { title: ARCHETYPES[id].name } }, [media(id, 'media-xs')]))]);
+  const rows = CHARACTER_IDS.map((rowId) => h('tr', {}, [
     h('th', { attrs: { title: ARCHETYPES[rowId].name } }, [media(rowId, 'media-xs')]),
-    ...ARCHETYPE_IDS.map((colId) => {
+    ...CHARACTER_IDS.map((colId) => {
       if (rowId === colId) return h('td', { class: 'cell-self' });
       const r = latest.get(`${rowId}|${colId}`);
       const cls = !r ? 'cell-empty' : r.winner === 'a' ? 'cell-a' : r.winner === 'b' ? 'cell-b' : 'cell-draw';
@@ -440,7 +460,7 @@ function matrixView() {
         class: `cell ${cls}`,
         text: r ? `${r.scoreA}:${r.scoreB}` : '',
         attrs: { title: r ? `${ARCHETYPES[rowId].name} vs ${ARCHETYPES[colId].name}: ${r.title}` : `${ARCHETYPES[rowId].name} vs ${ARCHETYPES[colId].name}` },
-        on: { click: () => { if (!isRunning()) setState({ a: rowId, b: colId, run: null }); } },
+        on: { click: () => { if (!isRunning()) setState({ a: rowId, b: colId, attA: '', attB: '', run: null }); } },
       });
     }),
   ]));
@@ -456,13 +476,9 @@ function render() {
     'lab-body',
     h('span', { class: 'eyebrow', text: 'Теория игр · эксперимент' }),
     h('h1', { class: 'display', text: 'Кто кого?' }),
-    h('p', { class: 'lead', text: 'Сведите двух персонажей и посмотрите, чем кончится их общение. У каждого скрытый мотив — его «выигрыш». ИИ-аналитик решит, кто добился своего.' }),
+    h('p', { class: 'lead', text: 'Сведите двух персонажей и посмотрите, чем кончится их общение. Каждый — паттерн характера плюс стиль привязанности, у каждого скрытый мотив — его «выигрыш». ИИ-аналитик решит, кто добился своего.' }),
     h('div', { class: 'arena' }, [slotView('a'), h('div', { class: 'vs', text: 'vs' }), slotView('b')]),
-    rosterView(),
-    h('h3', { text: 'Стадия отношений' }),
-    scenarioView(),
-    introView(),
-    h('div', { class: 'row' }, [
+    h('div', { class: 'launch-row' }, [
       h('button', {
         class: 'btn btn-primary',
         text: 'Запустить эксперимент',
@@ -470,16 +486,23 @@ function render() {
         on: { click: () => runExperiment() },
       }),
       h('button', { class: 'btn btn-ghost', text: 'Поменять местами', attrs: !ready || isRunning() ? { disabled: '' } : {}, on: { click: swap } }),
-      !state.run && speedPickerView(),
-    ].filter(Boolean)),
+    ]),
+    rosterView(),
+    h('h3', { text: 'Стадия отношений' }),
+    scenarioView(),
+    introView(),
+    !state.run && h('div', { class: 'row' }, [speedPickerView()]),
     runView(),
     h('h2', { text: 'Матрица «кто кого»' }),
     matrixView(),
   );
 }
 
-/** @param {string} [presetId] - archetype to put into slot A */
+/** @param {string} [presetId] - a character for slot A, or an attachment style for player A */
 export function renderLab(presetId) {
-  if (isArchetype(presetId) && !isRunning()) state = { ...state, a: presetId, b: state.b === presetId ? null : state.b, run: null };
+  if (!isRunning()) {
+    if (isCharacter(presetId)) state = { ...state, a: presetId, attA: '', ...(state.b === presetId ? { b: null, attB: '' } : {}), run: null };
+    else if (ATTACHMENT_IDS.includes(presetId)) state = { ...state, attA: presetId, run: null };
+  }
   render();
 }

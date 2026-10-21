@@ -1,12 +1,12 @@
 // «Дуэль тактик» UI: pick two people (a character pattern plus an attachment style), watch three acts of tactic cards,
 // see how the relationship ends; run the full tournament.
 
-import { ARCHETYPES, CHARACTER_IDS, ATTACHMENT_IDS, ATTACHMENT_MAP, attachmentLabel } from './archetypes.js';
+import { ARCHETYPES, CHARACTER_IDS, ATTACHMENT_IDS, attachmentLabel } from './archetypes.js';
 import { DIM_KEYS, rankArchetypes, attachmentStyle } from './quiz.js';
 import { PERSONA_NAMES } from './lab-data.js';
 import { CARDS, FAMILIES, OUTCOMES, MAX_TURNS, START, ACTS, AXES, AXIS_KEYS } from './duel-data.js';
 import { runDuel, decisiveEvent, tournament, makeProfile, profileFromQuiz, typicalAttachment } from './duel-engine.js';
-import { h, mount, store, media } from './ui.js';
+import { h, mount, store, media, attachmentChips } from './ui.js';
 import { track } from './track.js';
 
 const HISTORY_KEY = 'duel-history';
@@ -264,22 +264,15 @@ function cardView(event, { big = true } = {}) {
 function attachmentControls(side) {
   const id = state[side];
   const chosen = state[attKey(side)];
-  const lock = state.run && !state.run.done ? { disabled: '' } : {};
-  const typical = typicalAttachment(id);
-  const option = (value, label) => h('button', {
-    class: `chip ${chosen === value ? 'is-active' : ''}`,
-    attrs: lock,
-    text: label,
-    on: { click: () => setAttachment(side, value) },
-  });
   const preview = makeProfile(id, { attachment: chosen && chosen !== 'random' ? chosen : null });
   return h('div', { class: 'duel-mix' }, [
-    h('span', { class: 'duel-mix-label', text: 'Привязанность' }),
-    h('div', { class: 'duel-mix-shares' }, [
-      option(TYPICAL, `типичная: ${ATTACHMENT_MAP[typical].short}`),
-      ...ATTACHMENT_IDS.filter((x) => x !== typical).map((x) => option(x, ATTACHMENT_MAP[x].short)),
-      option('random', 'случайная'),
-    ]),
+    attachmentChips({
+      typical: typicalAttachment(id),
+      value: chosen,
+      withRandom: true,
+      disabled: Boolean(state.run && !state.run.done),
+      onPick: (v) => setAttachment(side, v),
+    }),
     preview.borrowed.length > 0 && chosen !== 'random' && h('p', { class: 'muted small', text: `Из стиля привязанности — карта «${CARDS[preview.borrowed[0]].name}»` }),
     chosen === 'random' && h('p', { class: 'muted small', text: 'Стиль выпадет при старте' }),
     axesView(preview.axes, ARCHETYPES[id].color),
@@ -305,6 +298,16 @@ function myCta(locked) {
   ]);
 }
 
+/** The launch button sits right under the two players, centred. */
+function startRow() {
+  const ready = state.a && state.b && state.a !== state.b;
+  const { run } = state;
+  return h('div', { class: 'launch-row' }, [
+    h('button', { class: 'btn btn-primary', text: run?.done ? 'Запустить снова' : 'Запустить дуэль', attrs: ready ? {} : { disabled: '' }, on: { click: start } }),
+    h('button', { class: 'btn btn-ghost', text: '⇄ Поменять местами', attrs: ready ? {} : { disabled: '' }, on: { click: swap } }),
+  ]);
+}
+
 function picker() {
   const locked = state.run && !state.run.done;
   const slot = (side) => {
@@ -326,6 +329,7 @@ function picker() {
   };
   return h('div', {}, [
     h('div', { class: 'duel-versus' }, [slot('a'), h('span', { class: 'duel-vs', text: 'vs' }), slot('b')]),
+    startRow(),
     myCta(locked),
     h('p', { class: 'muted small duel-mix-note', text: 'Каждый игрок — паттерн характера плюс стиль привязанности. Привязанность — отдельный модуль: при любом характере она может быть любой и заметно меняет игру. Попробуйте одного и того же психопата с надёжной и с дезорганизованной привязанностью.' }),
     h('div', { class: 'roster' }, CHARACTER_IDS.map((id) => {
@@ -489,7 +493,6 @@ function matrixView() {
 }
 
 function render() {
-  const ready = state.a && state.b && state.a !== state.b;
   const { run } = state;
   mount(
     'duel-body',
@@ -498,10 +501,6 @@ function render() {
     (!run || run.done) && h('h1', { class: 'display', text: 'Кто кого?' }),
     (!run || run.done) && h('p', { class: 'lead', text: 'Два человека разыгрывают свои привычные тактики в трёх актах: знакомство, быт, кризис. Каждая карта — реальный приём из психологии со ссылкой на исследование. Манипуляции сильны на старте, но партнёр их узнаёт; в кризисе пару держит только умение чинить.' }),
     !run || run.done ? picker() : null,
-    (!run || run.done) && h('div', { class: 'row duel-start' }, [
-      h('button', { class: 'btn btn-primary', text: run?.done ? 'Новая дуэль' : 'Начать дуэль', attrs: ready ? {} : { disabled: '' }, on: { click: start } }),
-      h('button', { class: 'btn btn-ghost', text: '⇄ Поменять местами', attrs: ready ? {} : { disabled: '' }, on: { click: swap } }),
-    ]),
     run && board(),
     run?.done && resultView(),
     h('h2', { text: 'Турнир всех со всеми' }),

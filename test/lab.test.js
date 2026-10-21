@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { PERSONAS } from '../src/personas.js';
-import { ARCHETYPE_IDS } from '../public/js/archetypes.js';
+import { ARCHETYPE_IDS, CHARACTER_IDS } from '../public/js/archetypes.js';
 import { LAB_TURNS, SCENARIOS, SCENARIO_IDS, MOTIVES, PERSONA_NAMES, DOMINANTS } from '../public/js/lab-data.js';
 import {
   validateLabRequest, nextSpeaker, labSystem, labMessages, verdictPrompt, parseVerdict,
@@ -11,7 +11,7 @@ import {
 
 const line = (i) => ({ speaker: i % 2 === 0 ? 'a' : 'b', text: `реплика ${i}` });
 const transcriptOf = (n) => Array.from({ length: n }, (_, i) => line(i));
-const base = { a: 'grandiose-narcissist', b: 'secure', scenario: 'first-meeting', intro: 0 };
+const base = { a: 'grandiose-narcissist', b: 'hsp', scenario: 'first-meeting', intro: 0 };
 
 /** Fake provider that records calls and answers with `reply(params)`. */
 function fakeLlm(reply) {
@@ -38,6 +38,8 @@ test('validateLabRequest accepts a valid request and enforces alternation and li
   assert.equal(validateLabRequest({ ...base, transcript: transcriptOf(3) }).ok, true);
   const bad = [
     { ...base, a: 'nobody', transcript: [] },
+    { ...base, b: 'secure', transcript: [] },
+    { ...base, attA: 'hsp', transcript: [] },
     { ...base, b: base.a, transcript: [] },
     { ...base, scenario: 'war', transcript: [] },
     { ...base, intro: 99, transcript: [] },
@@ -86,8 +88,8 @@ test('labSystem gives the intro, opponent bio and motive; only A gets the openin
   assert.match(forB, /Первым заговорит Марк/);
   assert.ok(forA.includes(PERSONAS.borderline.bio));
   assert.ok(forA.includes(MOTIVES.psychopath));
-  for (const id of ARCHETYPE_IDS) {
-    const s = labSystem(id, id === 'secure' ? 'hsp' : 'secure', 'first-meeting', 1, 'a');
+  for (const id of CHARACTER_IDS) {
+    const s = labSystem(id, id === 'hsp' ? 'psychopath' : 'hsp', 'first-meeting', 1, 'a');
     assert.doesNotMatch(s, /проект/i, id);
   }
 });
@@ -112,13 +114,13 @@ test('parseVerdict extracts JSON, clamps scores and fills defaults', () => {
 });
 
 test('POST /api/lab/turn alternates speakers with the right persona prompts', async () => {
-  const llm = fakeLlm((p) => (p.system.startsWith('Ты — Артём') ? 'Я Артём' : 'Я Марина'));
+  const llm = fakeLlm((p) => (p.system.startsWith('Ты — Артём') ? 'Я Артём' : 'Я Соня'));
   const app = createApp({ llm });
   const first = await request(app).post('/api/lab/turn').send({ ...base, transcript: [] }).expect(200);
   assert.deepEqual(first.body.data, { speaker: 'a', text: 'Я Артём' });
   const second = await request(app).post('/api/lab/turn')
     .send({ ...base, transcript: [{ speaker: 'a', text: 'Я Артём' }] }).expect(200);
-  assert.deepEqual(second.body.data, { speaker: 'b', text: 'Я Марина' });
+  assert.deepEqual(second.body.data, { speaker: 'b', text: 'Я Соня' });
   assert.equal(llm.calls[0].mode, 'chat');
   assert.equal(llm.calls[1].messages[0].content, 'Я Артём');
 });
@@ -146,4 +148,25 @@ test('lab routes have their own per-IP limit', async () => {
   const res = await request(app).post('/api/lab/turn').send({ ...base, transcript: [] }).expect(429);
   assert.match(res.body.error, /экспериментов/);
   await request(app).get('/api/persona/random').expect(200);
+});
+
+test('each side is a character plus an attachment style: typical by default, in the prompt and the verdict', () => {
+  const v = validateLabRequest({ ...base, attB: 'fearful-avoidant', transcript: [] });
+  assert.equal(v.ok, true);
+  assert.equal(v.value.attA, 'avoidant', 'the grandiose narcissist defaults to his typical style');
+  assert.equal(v.value.attB, 'fearful-avoidant');
+  assert.match(labSystem('psychopath', 'hsp', 'romance', 0, 'a', 'secure'), /Твой стиль привязанности — надёжный/);
+  assert.match(labSystem('psychopath', 'hsp', 'romance', 0, 'a'), /Твой стиль привязанности — избегающий/);
+  const { user } = verdictPrompt({ ...v.value, transcript: transcriptOf(6) });
+  assert.match(user, /дезорганизованная привязанность/);
+});
+
+test('POST /api/lab/turn gives each side its own attachment style', async () => {
+  const llm = fakeLlm(() => 'ок');
+  const app = createApp({ llm });
+  await request(app).post('/api/lab/turn').send({ ...base, attA: 'secure', attB: 'anxious-preoccupied', transcript: [] }).expect(200);
+  await request(app).post('/api/lab/turn').send({ ...base, attA: 'secure', attB: 'anxious-preoccupied', transcript: transcriptOf(1) }).expect(200);
+  assert.match(llm.calls[0].system, /стиль привязанности — надёжный/);
+  assert.match(llm.calls[1].system, /стиль привязанности — тревожный/);
+  await request(app).post('/api/lab/turn').send({ ...base, attA: 'nope', transcript: [] }).expect(400);
 });

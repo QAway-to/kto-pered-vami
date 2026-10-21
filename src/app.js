@@ -238,17 +238,18 @@ ${formatTranscript(parsed.value, persona.name)}
   api.post('/lab/turn', labLimit, async (req, res, next) => {
     const parsed = validateLabRequest(req.body);
     if (!parsed.ok) return res.status(400).json(fail(parsed.error));
-    const { a, b, scenario, intro, transcript } = parsed.value;
-    const ref = `${a}|${b}|${scenario}|${intro}`;
+    const { a, b, attA, attB, scenario, intro, transcript } = parsed.value;
+    // The ticket binds the whole setup, attachment styles included, so it cannot change mid-run.
+    const ref = `${a}|${b}|${attA}|${attB}|${scenario}|${intro}`;
     const access = transcript.length === 0
       ? await gate.start(req, res, 'arena', ref)
       : (await gate.resume(req, res, 'arena', ref, req.body?.ticket)) && { ticket: null, refund: () => {} };
     if (!access || !spend(res, access.refund)) return undefined;
     const speaker = nextSpeaker(transcript);
-    const [self, other] = speaker === 'a' ? [a, b] : [b, a];
+    const [self, other, selfAtt] = speaker === 'a' ? [a, b, attA] : [b, a, attB];
     try {
       const line = await llm.complete({
-        system: labSystem(self, other, scenario, intro, speaker),
+        system: labSystem(self, other, scenario, intro, speaker, selfAtt),
         messages: labMessages(transcript, speaker, sceneCue(scenario, intro)),
         mode: 'chat',
         maxTokens: 600,
@@ -267,8 +268,8 @@ ${formatTranscript(parsed.value, persona.name)}
   api.post('/lab/verdict', labLimit, async (req, res, next) => {
     const parsed = validateLabRequest(req.body, { forVerdict: true });
     if (!parsed.ok) return res.status(400).json(fail(parsed.error));
-    const { a, b, scenario, intro } = parsed.value;
-    if (!(await gate.resume(req, res, 'arena', `${a}|${b}|${scenario}|${intro}`, req.body?.ticket)) || !spend(res)) return undefined;
+    const { a, b, attA, attB, scenario, intro } = parsed.value;
+    if (!(await gate.resume(req, res, 'arena', `${a}|${b}|${attA}|${attB}|${scenario}|${intro}`, req.body?.ticket)) || !spend(res)) return undefined;
     const { system, user } = verdictPrompt(parsed.value);
     try {
       const reply = await llm.complete({

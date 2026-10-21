@@ -1,6 +1,6 @@
 // Shared browser helpers: DOM builder, API client, storage and archetype artwork.
 
-import { ARCHETYPES, ATTACHMENT_MAP, archetypeImage } from './archetypes.js';
+import { ARCHETYPES, ATTACHMENT_IDS, ATTACHMENT_MAP, archetypeImage } from './archetypes.js';
 import { SCENARIOS, SCENARIO_IDS } from './lab-data.js';
 import { getToken, setToken } from './session.js';
 
@@ -161,5 +161,26 @@ export function attachmentMap({ active = null, dot = null, onPick = null } = {})
     h('span', { class: 'att-axis att-axis-y', text: 'Тревога ↑' }),
     plot,
     h('span', { class: 'att-axis att-axis-x', text: 'Избегание →' }),
+  ]);
+}
+
+/**
+ * Attachment style picker for one player: '' = the character's typical style, then the other styles, optionally 'random'.
+ * @param {{typical: string, value: string, onPick: (value: string) => void, disabled?: boolean, withRandom?: boolean}} opts
+ */
+export function attachmentChips({ typical, value, onPick, disabled = false, withRandom = false }) {
+  const option = (v, label) => h('button', {
+    class: `chip ${value === v ? 'is-active' : ''}`,
+    attrs: { type: 'button', ...(disabled ? { disabled: '' } : {}) },
+    text: label,
+    on: { click: () => onPick(v) },
+  });
+  return h('div', { class: 'att-chips' }, [
+    h('span', { class: 'att-chips-label', text: 'Привязанность' }),
+    h('div', { class: 'att-chips-row' }, [
+      option('', `типичная: ${ATTACHMENT_MAP[typical].short}`),
+      ...ATTACHMENT_IDS.filter((x) => x !== typical).map((x) => option(x, ATTACHMENT_MAP[x].short)),
+      withRandom && option('random', 'случайная'),
+    ]),
   ]);
 }

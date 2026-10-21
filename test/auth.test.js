@@ -182,7 +182,7 @@ test('AI trainings need a session', async () => {
   const { app } = telegramApp();
   const res = await request(app).post('/api/chat').send(opening()).expect(401);
   assert.equal(res.body.code, 'auth_required');
-  await request(app).post('/api/lab/turn').send({ a: 'secure', b: 'hsp', ...scene, transcript: [] }).expect(401);
+  await request(app).post('/api/lab/turn').send({ a: 'psychopath', b: 'hsp', ...scene, transcript: [] }).expect(401);
 });
 
 test('subscriber: profiling start issues a ticket that continuing and debrief require', async () => {
@@ -214,7 +214,7 @@ test('non-subscriber gets one free profiling and one free arena, then 402', asyn
   await request(app).post('/api/chat').set('Authorization', auth).send(opening()).expect(200);
   const second = await request(app).post('/api/chat').set('Authorization', auth).send(opening('hsp')).expect(402);
   assert.equal(second.body.code, 'subscription_required');
-  const arena = { a: 'secure', b: 'hsp', ...scene, transcript: [] };
+  const arena = { a: 'psychopath', b: 'hsp', ...scene, transcript: [] };
   const first = await request(app).post('/api/lab/turn').set('Authorization', auth).send(arena).expect(200);
   assert.ok(first.body.data.ticket);
   await request(app).post('/api/lab/turn').set('Authorization', auth).send(arena).expect(402);
@@ -237,7 +237,7 @@ const llmModule = await import('../src/llm.js');
 test('arena verdict requires the run ticket', async () => {
   const { app } = telegramApp({ llm: fakeLlm('{"winner":"a","outcome":"continue","scoreA":6,"scoreB":4,"title":"t"}') });
   const auth = `Bearer ${await login(app)}`;
-  const base = { a: 'secure', b: 'hsp', ...scene };
+  const base = { a: 'psychopath', b: 'hsp', ...scene };
   const { ticket } = (await request(app).post('/api/lab/turn').set('Authorization', auth).send({ ...base, transcript: [] }).expect(200)).body.data;
   const transcript = Array.from({ length: 10 }, (_, i) => ({ speaker: i % 2 ? 'b' : 'a', text: `line ${i}` }));
   await request(app).post('/api/lab/verdict').set('Authorization', auth).send({ ...base, transcript }).expect(403);
