@@ -208,7 +208,7 @@ export const DECKS = {
 
 /**
  * Six research axes, 0..10. They describe the person; the engine derives how they play from them,
- * so a mix of two types is simply a weighted mix of their axes.
+ * so a character with an attachment style is simply a weighted mix of their axes.
  */
 export const AXES = {
   honesty: { label: 'Честность', source: 'HEXACO: честность–скромность, обратна «тёмному ядру» (Moshagen et al., 2018)' },
@@ -223,7 +223,7 @@ export const AXIS_KEYS = Object.freeze(Object.keys(AXES));
 
 /** Prototype of each archetype on the six axes (our reading of the literature, not norms). */
 export const PROFILES = {
-  'dark-empath': { honesty: 2, anxiety: 4, avoidance: 4, stability: 5, warmth: 6, boundaries: 6 },
+  'dark-empath': { honesty: 2, anxiety: 6, avoidance: 4, stability: 5, warmth: 6, boundaries: 6 },
   'grandiose-narcissist': { honesty: 1, anxiety: 2, avoidance: 6, stability: 6, warmth: 2, boundaries: 7 },
   'vulnerable-narcissist': { honesty: 3, anxiety: 8, avoidance: 6, stability: 2, warmth: 3, boundaries: 4 },
   machiavellian: { honesty: 1, anxiety: 3, avoidance: 7, stability: 7, warmth: 2, boundaries: 7 },
@@ -237,8 +237,11 @@ export const PROFILES = {
   'fearful-avoidant': { honesty: 6, anxiety: 8, avoidance: 8, stability: 2, warmth: 5, boundaries: 3 },
 };
 
-/** Nobody is a pure type: a mix takes 20–30% of a second one (dimensional view, Haslam et al., 2012). */
-export const MIX = Object.freeze({ min: 0.2, max: 0.3, default: 0.25 });
+/**
+ * A player is a character pattern plus an attachment style. The style sets most of the two attachment axes
+ * (anxiety, avoidance) and nudges the rest: secure attachment buffers, insecure styles fray (Mikulincer & Shaver, 2016).
+ */
+export const ATTACHMENT_WEIGHT = Object.freeze({ attachmentAxes: 0.6, otherAxes: 0.15 });
 
 /**
  * A duel runs in three acts. Early on manipulation works best (admiration charms at first, Wurst et al., 2017);

@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { ARCHETYPES, ARCHETYPE_IDS, IMAGES_READY, archetypeImage } from '../public/js/archetypes.js';
-import { QUESTIONS, DIM_KEYS, PROTOTYPES, scoreDimensions, rankArchetypes } from '../public/js/quiz.js';
+import { ARCHETYPES, ARCHETYPE_IDS, CHARACTER_IDS, IMAGES_READY, archetypeImage, attachmentQuadrant } from '../public/js/archetypes.js';
+import { QUESTIONS, DIM_KEYS, PROTOTYPES, scoreDimensions, rankArchetypes, attachmentStyle } from '../public/js/quiz.js';
 import { CASES } from '../public/js/cases.js';
 import { validateMessages, isPersonaId, MAX_MESSAGES, MAX_MESSAGE_CHARS } from '../src/validate.js';
 import { PERSONAS, PERSONA_IDS, publicPersona } from '../src/personas.js';
@@ -22,16 +22,17 @@ test('there are at least 10 archetypes, each fully described with sources', () =
   }
 });
 
-test('every archetype has a persona, a prototype and at least one case', () => {
+test('every archetype has a persona and a case; every character pattern has a prototype', () => {
   assert.deepEqual([...PERSONA_IDS].sort(), [...ARCHETYPE_IDS].sort());
-  assert.deepEqual(Object.keys(PROTOTYPES).sort(), [...ARCHETYPE_IDS].sort());
+  assert.deepEqual(Object.keys(PROTOTYPES).sort(), [...CHARACTER_IDS].sort(), 'attachment styles come from the scales, not prototypes');
   for (const c of CASES) assert.ok(ARCHETYPE_IDS.includes(c.answer), c.answer);
   for (const id of ARCHETYPE_IDS) assert.ok(CASES.some((c) => c.answer === id), `no case for ${id}`);
 });
 
-test('quiz covers every dimension with two items and prototypes use known dimensions', () => {
-  assert.equal(QUESTIONS.length, DIM_KEYS.length * 2);
-  for (const k of DIM_KEYS) assert.equal(QUESTIONS.filter((q) => q.dim === k).length, 2);
+test('quiz covers every dimension, attachment scales with four items, and prototypes use known dimensions', () => {
+  for (const k of DIM_KEYS) assert.ok(QUESTIONS.filter((q) => q.dim === k).length >= 2, k);
+  for (const k of ['ANX', 'AVO']) assert.equal(QUESTIONS.filter((q) => q.dim === k).length, 4, k);
+  QUESTIONS.slice(1).forEach((q, i) => assert.notEqual(q.dim, QUESTIONS[i].dim, 'neighbouring questions measure different things'));
   for (const { high, low } of Object.values(PROTOTYPES)) {
     for (const d of [...high, ...low]) assert.ok(DIM_KEYS.includes(d), d);
   }
@@ -50,8 +51,8 @@ test('scoreDimensions rejects bad input', () => {
   assert.throws(() => scoreDimensions(QUESTIONS.map(() => 6)), RangeError);
 });
 
-test('each archetype prototype ranks itself first, strictly', () => {
-  for (const id of ARCHETYPE_IDS) {
+test('each character prototype ranks itself first, strictly', () => {
+  for (const id of CHARACTER_IDS) {
     const [first, second] = rankArchetypes(scoreDimensions(idealAnswers(id)));
     assert.equal(first.id, id);
     assert.equal(first.match, 100);
@@ -130,4 +131,16 @@ test('ipKey collapses IPv6 to /64 and unwraps v4-mapped addresses', async () => 
 test('validateMessages enforces the total size cap', () => {
   const big = Array.from({ length: 20 }, (_, i) => ({ role: i % 2 ? 'user' : 'assistant', content: 'x'.repeat(i % 2 ? 1000 : 1000) }));
   assert.equal(validateMessages(big).ok, false);
+});
+
+test('the attachment style is the quadrant of the anxiety and avoidance scales', () => {
+  assert.equal(attachmentQuadrant(0.1, 0.2), 'secure');
+  assert.equal(attachmentQuadrant(0.9, 0.2), 'anxious-preoccupied');
+  assert.equal(attachmentQuadrant(0.1, 0.9), 'avoidant');
+  assert.equal(attachmentQuadrant(0.9, 0.9), 'fearful-avoidant');
+  assert.equal(attachmentQuadrant(0.5, 0.5), 'secure', 'the midpoint is not yet high');
+  const answers = (anx, avo) => QUESTIONS.map((q) => (q.dim === 'ANX' ? anx : q.dim === 'AVO' ? avo : 3));
+  assert.equal(attachmentStyle(scoreDimensions(answers(5, 1))).id, 'anxious-preoccupied');
+  assert.equal(attachmentStyle(scoreDimensions(answers(5, 5))).id, 'fearful-avoidant');
+  assert.ok(CHARACTER_IDS.includes(rankArchetypes(scoreDimensions(answers(5, 5)))[0].id), 'ranking holds character patterns only');
 });

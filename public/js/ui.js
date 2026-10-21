@@ -1,6 +1,6 @@
 // Shared browser helpers: DOM builder, API client, storage and archetype artwork.
 
-import { ARCHETYPES, archetypeImage } from './archetypes.js';
+import { ARCHETYPES, ATTACHMENT_MAP, archetypeImage } from './archetypes.js';
 import { SCENARIOS, SCENARIO_IDS } from './lab-data.js';
 import { getToken, setToken } from './session.js';
 
@@ -130,5 +130,36 @@ export function introCard({ scenario, intro, opener, disabled = false, onReroll 
     ]),
     h('p', { class: 'intro-text', text: intros[intro].text }),
     h('p', { class: 'muted small', text: `${setting} Первым заговаривает ${opener}.` }),
+  ]);
+}
+
+/**
+ * Attachment as a 2×2 map: anxiety up the side, avoidance along the bottom (Bartholomew & Horowitz, 1991).
+ * @param {{active?: string, dot?: {anxiety: number, avoidance: number}, onPick?: (id: string) => void}} [opts]
+ *   active — highlighted style; dot — a person's scores (0..1) drawn as a point
+ */
+export function attachmentMap({ active = null, dot = null, onPick = null } = {}) {
+  const cell = (anx, avo) => {
+    const id = Object.keys(ATTACHMENT_MAP).find((k) => ATTACHMENT_MAP[k].anxiety === anx && ATTACHMENT_MAP[k].avoidance === avo);
+    const a = ARCHETYPES[id];
+    return h(onPick ? 'button' : 'div', {
+      class: `att-cell ${id === active ? 'is-active' : ''}`,
+      vars: { '--c': a.color },
+      on: onPick ? { click: () => onPick(id) } : {},
+      attrs: onPick ? { 'aria-label': a.name } : {},
+    }, [h('strong', { text: a.name }), h('span', { class: 'muted small', text: a.coreTrait })]);
+  };
+  const plot = h('div', { class: 'att-plot' }, [
+    cell('high', 'low'), cell('high', 'high'), cell('low', 'low'), cell('low', 'high'),
+    dot && h('span', {
+      class: 'att-dot',
+      attrs: { title: 'Вы', 'aria-label': 'Ваш результат' },
+      vars: { left: `${Math.round(dot.avoidance * 100)}%`, top: `${Math.round((1 - dot.anxiety) * 100)}%` },
+    }),
+  ]);
+  return h('div', { class: 'att-map' }, [
+    h('span', { class: 'att-axis att-axis-y', text: 'Тревога ↑' }),
+    plot,
+    h('span', { class: 'att-axis att-axis-x', text: 'Избегание →' }),
   ]);
 }

@@ -1,7 +1,8 @@
-// Screening quiz: 13 dimensions × 2 original items, Likert 1–5.
+// Screening quiz: 13 dimensions, Likert 1–5. Two separate results: the closest character pattern (prototype match)
+// and the attachment style (quadrant of the anxiety and avoidance scales, 4 items each).
 // Items are our own wording for each construct (validated scales are copyrighted); this is a screen, not a diagnosis.
 
-import { ARCHETYPE_IDS } from './archetypes.js';
+import { attachmentQuadrant } from './archetypes.js';
 
 export const DIMENSIONS = {
   MACH: 'Расчётливость',
@@ -29,8 +30,8 @@ const ITEMS_BY_DIM = {
   SAD: ['Мне бывает смешно, когда кто-то попадает в неловкое положение.', 'Поддеть человека так, чтобы он вспылил, — это забавно.'],
   AEMP: ['Когда близкому плохо, я почти физически чувствую его боль.', 'Чужие грустные истории надолго выбивают меня из колеи.'],
   CEMP: ['Я легко понимаю, что человек чувствует, даже если он это скрывает.', 'Обычно я могу предсказать, как человек отреагирует на мои слова.'],
-  ANX: ['Я боюсь, что близкие люди могут меня бросить.', 'Если мне долго не отвечают на сообщение, я начинаю тревожиться.'],
-  AVO: ['Мне некомфортно, когда кто-то становится слишком близким.', 'Я предпочитаю ни от кого не зависеть и не показывать, что мне кто-то нужен.'],
+  ANX: ['Я боюсь, что близкие люди могут меня бросить.', 'Если мне долго не отвечают на сообщение, я начинаю тревожиться.', 'Мне нужно часто слышать, что меня любят и ценят.', 'Когда близкий человек отдаляется, мне хочется срочно вернуть его внимание.'],
+  AVO: ['Мне некомфортно, когда кто-то становится слишком близким.', 'Я предпочитаю ни от кого не зависеть и не показывать, что мне кто-то нужен.', 'Мне трудно полностью доверять партнёру и опираться на него.', 'Когда отношения становятся серьёзными, мне хочется больше свободы.'],
   EMO: ['Моё настроение может резко меняться несколько раз за день.', 'Моё отношение к человеку может быстро смениться с восхищения на разочарование.'],
   SPS: ['Громкие звуки, яркий свет и толпа быстро меня утомляют.', 'Я замечаю тонкости — интонации, запахи, детали, — которые другие пропускают.'],
   ALEX: ['Мне трудно понять, какое именно чувство я сейчас испытываю.', 'Я предпочитаю обсуждать факты и дела, а не чувства.'],
@@ -38,11 +39,15 @@ const ITEMS_BY_DIM = {
 };
 
 // Interleaved so neighbouring questions measure different things.
-export const QUESTIONS = Object.freeze([0, 1].flatMap((n) => DIM_KEYS.map((dim) => ({ dim, text: ITEMS_BY_DIM[dim][n] }))));
+const ROUNDS = Math.max(...DIM_KEYS.map((k) => ITEMS_BY_DIM[k].length));
+export const QUESTIONS = Object.freeze([...Array(ROUNDS).keys()].flatMap((n) => DIM_KEYS
+  .filter((dim) => n < ITEMS_BY_DIM[dim].length)
+  .map((dim) => ({ dim, text: ITEMS_BY_DIM[dim][n] }))));
 
 export const LIKERT = Object.freeze(['Совсем не про меня', 'Скорее нет', 'Отчасти', 'Скорее да', 'Точно про меня']);
 
-// Each archetype is a prototype: dimensions expected high and low.
+// Each character pattern is a prototype: dimensions expected high and low. Attachment styles are not matched here:
+// they come straight from the anxiety and avoidance scales (see attachmentStyle).
 export const PROTOTYPES = {
   'dark-empath': { high: ['MACH', 'GNARC', 'CEMP', 'AEMP'], low: [] },
   'grandiose-narcissist': { high: ['GNARC'], low: ['VNARC', 'ANX'] },
@@ -50,11 +55,7 @@ export const PROTOTYPES = {
   machiavellian: { high: ['MACH', 'CEMP'], low: ['AEMP', 'EMO'] },
   psychopath: { high: ['PSY', 'SAD', 'MACH'], low: ['AEMP', 'ANX'] },
   borderline: { high: ['EMO', 'ANX', 'AEMP'], low: ['AVO'] },
-  avoidant: { high: ['AVO', 'ALEX'], low: ['ANX'] },
   hsp: { high: ['SPS', 'AEMP'], low: ['PSY'] },
-  secure: { high: ['LIGHT'], low: ['ANX', 'AVO', 'EMO', 'MACH'] },
-  'anxious-preoccupied': { high: ['ANX'], low: ['AVO', 'EMO', 'MACH'] },
-  'fearful-avoidant': { high: ['ANX', 'AVO'], low: ['LIGHT'] },
   'control-freak': { high: ['ALEX', 'ANX'], low: ['PSY', 'EMO', 'AVO'] },
 };
 
@@ -76,16 +77,25 @@ export function scoreDimensions(answers) {
 }
 
 /**
- * Ranks archetypes by closeness of the person's dimensions to each prototype.
+ * Ranks character patterns by closeness of the person's dimensions to each prototype.
  * @param {Record<string, number>} dims - output of scoreDimensions
  * @returns {{id: string, match: number}[]} best first, match in 0..100
  */
 export function rankArchetypes(dims) {
-  const ranked = ARCHETYPE_IDS.map((id) => {
+  const ranked = Object.keys(PROTOTYPES).map((id) => {
     const { high, low } = PROTOTYPES[id];
     const parts = [...high.map((d) => dims[d]), ...low.map((d) => 1 - dims[d])];
     const match = Math.round((parts.reduce((a, b) => a + b, 0) / parts.length) * 100);
     return { id, match };
   });
   return ranked.sort((a, b) => b.match - a.match);
+}
+
+/**
+ * The attachment style is a quadrant of two scales, not a prototype match.
+ * @param {Record<string, number>} dims - output of scoreDimensions
+ * @returns {{id: string, anxiety: number, avoidance: number}}
+ */
+export function attachmentStyle(dims) {
+  return { id: attachmentQuadrant(dims.ANX, dims.AVO), anxiety: dims.ANX, avoidance: dims.AVO };
 }

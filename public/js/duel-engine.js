@@ -1,8 +1,9 @@
 // «Дуэль тактик» engine: pure functions, no DOM. The same seed always plays the same duel.
 
 import {
-  CARDS, DECKS, PROFILES, AXIS_KEYS, MIX, START, MAX_TURNS, HAND_SIZE, ACTS, CRISIS, DARK, NARCISSISTS, OUTCOMES,
+  CARDS, DECKS, PROFILES, AXIS_KEYS, ATTACHMENT_WEIGHT, START, MAX_TURNS, HAND_SIZE, ACTS, CRISIS, DARK, NARCISSISTS, OUTCOMES,
 } from './duel-data.js';
+import { CHARACTER_IDS, ATTACHMENT_IDS, attachmentQuadrant } from './archetypes.js';
 
 const clamp = (n) => Math.max(0, Math.min(10, n));
 const MAX_HIT = 3; // the most a single card can take from one meter
@@ -43,47 +44,46 @@ export function styleOf(x) {
   };
 }
 
+/** The attachment style a character pattern most often comes with: the quadrant of its own anxiety and avoidance. */
+export const typicalAttachment = (character) => attachmentQuadrant(PROFILES[character].anxiety / 10, PROFILES[character].avoidance / 10);
+
 /**
- * A person: a core archetype with an optional 20–30% admixture of another one.
- * The axes blend by weight; the deck gets the admixture's favourite card that the core lacks.
- * @param {string} core
- * @param {{mix?: string|null, share?: number}} [opts]
+ * A player: a character pattern plus an attachment style (its typical one by default).
+ * The style sets most of the anxiety and avoidance axes and nudges the rest; the deck gets the style's
+ * favourite move that the character lacks.
+ * @param {string} character - one of CHARACTER_IDS
+ * @param {{attachment?: string|null}} [opts] - one of ATTACHMENT_IDS; null = typical
  */
-export function makeProfile(core, { mix = null, share = MIX.default } = {}) {
-  if (!PROFILES[core]) throw new RangeError('Unknown archetype');
-  if (mix !== null && (!PROFILES[mix] || mix === core)) throw new RangeError('Unknown admixture');
-  const w = mix ? Math.min(MIX.max, Math.max(MIX.min, Number.isFinite(share) ? share : MIX.default)) : 0;
+export function makeProfile(character, { attachment = null } = {}) {
+  if (!CHARACTER_IDS.includes(character)) throw new RangeError('Unknown character pattern');
+  if (attachment !== null && !ATTACHMENT_IDS.includes(attachment)) throw new RangeError('Unknown attachment style');
+  const att = attachment ?? typicalAttachment(character);
+  const weight = (k) => (k === 'anxiety' || k === 'avoidance' ? ATTACHMENT_WEIGHT.attachmentAxes : ATTACHMENT_WEIGHT.otherAxes);
   const axes = Object.fromEntries(AXIS_KEYS.map((k) => [
-    k, Math.round(((1 - w) * PROFILES[core][k] + w * (mix ? PROFILES[mix][k] : 0)) * 10) / 10,
+    k, Math.round(((1 - weight(k)) * PROFILES[character][k] + weight(k) * PROFILES[att][k]) * 10) / 10,
   ]));
-  const borrowed = mix ? DECKS[mix].filter((c) => !DECKS[core].includes(c)).slice(0, 1) : [];
-  return { id: core, mix, share: w, axes, style: styleOf(axes), deck: [...DECKS[core], ...borrowed], borrowed };
+  const borrowed = DECKS[att].filter((c) => !DECKS[character].includes(c)).slice(0, 1);
+  return {
+    id: character, attachment: att, typical: att === typicalAttachment(character),
+    axes, style: styleOf(axes), deck: [...DECKS[character], ...borrowed], borrowed,
+  };
 }
 
-/** A random admixture: another archetype at 20, 25 or 30%. */
-export function randomProfile(core, rng) {
-  const others = Object.keys(PROFILES).filter((id) => id !== core);
-  const mix = others[Math.floor(rng() * others.length)];
-  const share = MIX.min + Math.floor(rng() * 3) * 0.05;
-  return makeProfile(core, { mix, share });
+/** The character with a random attachment style. */
+export function randomProfile(character, rng) {
+  return makeProfile(character, { attachment: ATTACHMENT_IDS[Math.floor(rng() * ATTACHMENT_IDS.length)] });
 }
 
 /**
- * The player's own profile from the quiz ranking: the closest type is the core, the closest type of the other layer
- * (attachment for a character, character for an attachment style) is the admixture. The closer it ranks to the core,
- * the bigger its share, within 20–30%.
- * @param {{id: string, match: number}[]} ranked - rankArchetypes output, best first
- * @param {Record<string, string>} layerOf - archetype id → layer name
+ * The player's own profile from the test: the closest character pattern plus the attachment style from the scales.
+ * @param {{ranked: {id: string}[], attachment: {id: string}}} result
  * @returns {object|null}
  */
-export function profileFromQuiz(ranked, layerOf) {
-  const [top] = ranked ?? [];
-  if (!top || !PROFILES[top.id]) return null;
-  const second = ranked.find((r) => PROFILES[r.id] && layerOf[r.id] && layerOf[r.id] !== layerOf[top.id]);
-  if (!second) return makeProfile(top.id);
-  const closeness = top.match > 0 ? Math.min(1, second.match / top.match) : 0;
-  const share = Math.round((MIX.min + (MIX.max - MIX.min) * closeness) * 20) / 20;
-  return makeProfile(top.id, { mix: second.id, share });
+export function profileFromQuiz(result) {
+  const character = result?.ranked?.find((r) => CHARACTER_IDS.includes(r.id))?.id;
+  if (!character) return null;
+  const attachment = ATTACHMENT_IDS.includes(result.attachment?.id) ? result.attachment.id : null;
+  return makeProfile(character, { attachment });
 }
 
 const asProfile = (p) => (typeof p === 'string' ? makeProfile(p) : p);
@@ -114,7 +114,7 @@ function personal(player, { esteem, trust }) {
   };
 }
 
-/** @param {string|object} a @param {string|object} b - archetype ids or profiles from makeProfile */
+/** @param {string|object} a @param {string|object} b - character ids (typical attachment) or profiles from makeProfile */
 export function initState(a, b) {
   const player = (p) => ({ ...asProfile(p), esteem: START.esteem, trust: START.trust, shield: false, hooked: false, seen: {} });
   return { a: player(a), b: player(b), turn: 0 };
@@ -288,7 +288,7 @@ const snapshot = (s) => ({ a: { ...s.a }, b: { ...s.b } });
  * @returns {{events: object[], hands: (string[]|null)[], final: object, result: object}}
  */
 export function runDuel(a, b, { seed = 1 } = {}) {
-  for (const p of [a, b]) if (typeof p === 'string' && !DECKS[p]) throw new RangeError('Unknown archetype');
+  for (const p of [a, b]) if (typeof p === 'string' && !CHARACTER_IDS.includes(p)) throw new RangeError('Unknown character pattern');
   const rng = makeRng(seed);
   let state = initState(a, b);
   const events = [];
@@ -318,10 +318,12 @@ export function runDuel(a, b, { seed = 1 } = {}) {
 export const unionIndex = (avg) => Math.round(((avg + 2) / 5) * 100);
 
 /**
- * Round-robin: every ordered pair plays `runs` duels. With `mixed`, every player gets a random admixture each game.
+ * Round-robin of character patterns: every ordered pair plays `runs` duels.
+ * `attachment`: 'typical' (each with its usual style), 'random' (a random style every game) or a style id for everyone.
  * The board ranks by union quality: who builds relationships, not who wins arguments.
  */
-export function tournament(ids, { runs = 20, seed = 7, mixed = false } = {}) {
+export function tournament(ids = CHARACTER_IDS, { runs = 20, seed = 7, attachment = 'typical' } = {}) {
+  if (attachment !== 'typical' && attachment !== 'random' && !ATTACHMENT_IDS.includes(attachment)) throw new RangeError('Unknown attachment mode');
   const blank = (id) => ({ id, games: 0, wins: 0, healthy: 0, pragmatic: 0, broke: 0, left: 0, esteemSum: 0, unionSum: 0 });
   const stats = Object.fromEntries(ids.map((id) => [id, blank(id)]));
   const pairs = {};
@@ -333,8 +335,10 @@ export function tournament(ids, { runs = 20, seed = 7, mixed = false } = {}) {
       const pair = { wins: 0, losses: 0, draws: 0, healthy: 0, games: 0 };
       for (let r = 0; r < runs; r += 1) {
         n += 1;
-        const pa = mixed ? randomProfile(a, mixRng) : a;
-        const pb = mixed ? randomProfile(b, mixRng) : b;
+        const player = (id) => (attachment === 'random' ? randomProfile(id, mixRng)
+          : attachment === 'typical' ? makeProfile(id) : makeProfile(id, { attachment }));
+        const pa = player(a);
+        const pb = player(b);
         const { final, result } = runDuel(pa, pb, { seed: seed * 100_003 + n });
         pair.games += 1;
         for (const [side, id] of [['a', a], ['b', b]]) {

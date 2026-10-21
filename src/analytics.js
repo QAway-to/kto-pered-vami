@@ -22,7 +22,7 @@ export const EVENTS = Object.freeze([
 
 export const PROP_KEYS = Object.freeze([
   'platform', 'source', 'medium', 'campaign',
-  'archetype', 'guess', 'correct', 'known', 'scenario', 'turns', 'a', 'b', 'winner', 'method',
+  'archetype', 'attachment', 'guess', 'correct', 'known', 'scenario', 'turns', 'a', 'b', 'winner', 'method',
 ]);
 
 const DISTINCT_ID = /^[A-Za-z0-9-]{8,64}$/;

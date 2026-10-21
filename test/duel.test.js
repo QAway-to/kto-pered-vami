@@ -1,30 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ARCHETYPE_IDS, LAYERS } from '../public/js/archetypes.js';
+import { ARCHETYPE_IDS, LAYERS, CHARACTER_IDS, ATTACHMENT_IDS } from '../public/js/archetypes.js';
 import {
   CARDS, CARD_IDS, DECKS, PROFILES, AXIS_KEYS, FAMILIES, OUTCOMES, MAX_TURNS, START, ACTS,
 } from '../public/js/duel-data.js';
 import {
   makeRng, initState, drawHand, chooseCard, applyCard, isOver, judge, decisiveEvent, runDuel, tournament, similarity,
-  makeProfile, randomProfile, styleOf, recognition, profileFromQuiz,
+  makeProfile, randomProfile, styleOf, recognition, profileFromQuiz, typicalAttachment,
 } from '../public/js/duel-engine.js';
-import { rankArchetypes, scoreDimensions, QUESTIONS, PROTOTYPES } from '../public/js/quiz.js';
-
-const LAYER_OF = Object.fromEntries(Object.entries(LAYERS).flatMap(([layer, l]) => l.ids.map((id) => [id, layer])));
-
-test('the quiz result becomes a profile: top type as core, closest type of the other layer as admixture', () => {
-  const ideal = (id) => QUESTIONS.map((q) => (PROTOTYPES[id].high.includes(q.dim) ? 5 : PROTOTYPES[id].low.includes(q.dim) ? 1 : 3));
-  const p = profileFromQuiz(rankArchetypes(scoreDimensions(ideal('machiavellian'))), LAYER_OF);
-  assert.equal(p.id, 'machiavellian');
-  assert.equal(LAYER_OF[p.mix], 'attachment');
-  assert.ok(p.share >= 0.2 && p.share <= 0.3);
-  const q = profileFromQuiz(rankArchetypes(scoreDimensions(ideal('secure'))), LAYER_OF);
-  assert.equal(LAYER_OF[q.mix], 'character');
-  assert.equal(profileFromQuiz([], LAYER_OF), null);
-  assert.equal(profileFromQuiz([{ id: 'secure', match: 90 }], LAYER_OF).mix, null, 'no second layer in the ranking');
-});
+import { rankArchetypes, scoreDimensions, attachmentStyle, QUESTIONS, PROTOTYPES } from '../public/js/quiz.js';
 
 const cardsOf = (events) => events.filter((e) => e.kind !== 'crisis');
+const withStyle = (character, attachment) => makeProfile(character, { attachment });
+const avgUnion = (board) => board.reduce((s, x) => s + x.union, 0) / board.length;
 
 test('every archetype has a 5-card deck of known cards and a full axis profile', () => {
   assert.deepEqual(Object.keys(DECKS).sort(), [...ARCHETYPE_IDS].sort());
@@ -49,6 +37,8 @@ test('the two layers cover all archetypes exactly once', () => {
   const ids = Object.values(LAYERS).flatMap((l) => l.ids);
   assert.deepEqual([...ids].sort(), [...ARCHETYPE_IDS].sort());
   assert.equal(new Set(ids).size, ids.length);
+  assert.equal(CHARACTER_IDS.length, 8);
+  assert.equal(ATTACHMENT_IDS.length, 4);
 });
 
 test('play style follows the axes: honesty curbs exploitation, avoidance cuts bonding', () => {
@@ -60,20 +50,40 @@ test('play style follows the axes: honesty curbs exploitation, avoidance cuts bo
   assert.ok(styleOf(PROFILES.borderline).resilience > secure.resilience, 'low stability: hits land harder');
 });
 
-test('a profile mixes 20–30% of a second type into the axes and borrows one card', () => {
-  const pure = makeProfile('psychopath');
-  assert.equal(pure.share, 0);
-  assert.deepEqual(pure.deck, DECKS.psychopath);
-  const mixed = makeProfile('psychopath', { mix: 'secure', share: 0.25 });
-  assert.equal(mixed.share, 0.25);
-  assert.ok(mixed.axes.honesty > pure.axes.honesty);
-  assert.equal(mixed.deck.length, 6);
-  assert.ok(DECKS.secure.includes(mixed.borrowed[0]) && !DECKS.psychopath.includes(mixed.borrowed[0]));
-  assert.equal(makeProfile('psychopath', { mix: 'secure', share: 0.9 }).share, 0.3, 'share is capped');
-  assert.throws(() => makeProfile('psychopath', { mix: 'psychopath' }), RangeError);
-  assert.throws(() => makeProfile('nobody'), RangeError);
-  const r = randomProfile('secure', makeRng(3));
-  assert.ok(r.mix && r.mix !== 'secure' && r.share >= 0.2 && r.share <= 0.3);
+test('each character pattern has a typical attachment style from its own anxiety and avoidance', () => {
+  assert.equal(typicalAttachment('psychopath'), 'avoidant');
+  assert.equal(typicalAttachment('borderline'), 'anxious-preoccupied');
+  assert.equal(typicalAttachment('vulnerable-narcissist'), 'fearful-avoidant');
+  for (const id of CHARACTER_IDS) assert.ok(ATTACHMENT_IDS.includes(typicalAttachment(id)), id);
+});
+
+test('a player is a character pattern plus an attachment style', () => {
+  const typical = makeProfile('psychopath');
+  assert.equal(typical.attachment, 'avoidant');
+  assert.equal(typical.typical, true);
+  const secure = withStyle('psychopath', 'secure');
+  assert.equal(secure.typical, false);
+  assert.ok(secure.axes.avoidance < typical.axes.avoidance, 'the style sets most of the attachment axes');
+  assert.ok(secure.axes.honesty - typical.axes.honesty < 2, 'but only nudges the character');
+  assert.equal(secure.deck.length, 6);
+  assert.ok(DECKS.secure.includes(secure.borrowed[0]) && !DECKS.psychopath.includes(secure.borrowed[0]));
+  assert.throws(() => makeProfile('secure'), RangeError, 'an attachment style is not a character');
+  assert.throws(() => withStyle('psychopath', 'hsp'), RangeError);
+  assert.ok(ATTACHMENT_IDS.includes(randomProfile('hsp', makeRng(3)).attachment));
+});
+
+test('the test result becomes a profile: closest character pattern plus the attachment quadrant', () => {
+  const answers = QUESTIONS.map((q) => {
+    if (PROTOTYPES.machiavellian.high.includes(q.dim)) return 5;
+    if (q.dim === 'ANX' || q.dim === 'AVO' || PROTOTYPES.machiavellian.low.includes(q.dim)) return 1;
+    return 3;
+  });
+  const dims = scoreDimensions(answers);
+  const p = profileFromQuiz({ ranked: rankArchetypes(dims), attachment: attachmentStyle(dims) });
+  assert.equal(p.id, 'machiavellian');
+  assert.equal(p.attachment, 'secure');
+  assert.equal(profileFromQuiz({ ranked: [], attachment: null }), null);
+  assert.equal(profileFromQuiz({ ranked: [{ id: 'hsp' }] }).attachment, typicalAttachment('hsp'), 'no style: the typical one');
 });
 
 test('rng is deterministic and hands are distinct cards from the deck', () => {
@@ -99,28 +109,24 @@ test('applyCard changes meters, clamps to 0..10 and never mutates the input', ()
 });
 
 test('a boundary blocks the next manipulation once', () => {
-  let s = initState('psychopath', 'secure');
+  let s = initState('psychopath', withStyle('hsp', 'secure'));
   s = applyCard(s, 'b', 'boundary').state;
   assert.equal(s.b.shield, true);
   const hit = applyCard(s, 'a', 'gaslighting');
   assert.equal(hit.event.blocked, true);
   assert.equal(hit.state.b.esteem, s.b.esteem, 'blocked: no damage');
   assert.equal(hit.state.b.shield, false, 'the shield is used up');
-  const second = applyCard(hit.state, 'a', 'gaslighting');
-  assert.equal(second.event.blocked, false);
+  assert.equal(applyCard(hit.state, 'a', 'gaslighting').event.blocked, false);
 });
 
 test('a repeated trick is recognised: it works less, fastest for someone with firm boundaries', () => {
-  let s = initState('machiavellian', 'secure');
-  const first = applyCard(s, 'a', 'gaslighting');
-  s = first.state;
+  const first = applyCard(initState('machiavellian', 'hsp'), 'a', 'gaslighting');
   assert.equal(first.event.recognized, false);
-  const second = applyCard(s, 'a', 'gaslighting');
+  const second = applyCard(first.state, 'a', 'gaslighting');
   assert.equal(second.event.recognized, true);
   assert.ok(second.event.delta.target.esteem > first.event.delta.target.esteem, 'the second hit is softer');
-  const toSecure = recognition(applyCard(initState('machiavellian', 'secure'), 'a', 'gaslighting').state.b, 'gaslighting');
-  const toBorderline = recognition(applyCard(initState('machiavellian', 'borderline'), 'a', 'gaslighting').state.b, 'gaslighting');
-  assert.ok(toSecure < toBorderline);
+  const after = (target) => applyCard(initState('machiavellian', target), 'a', 'gaslighting').state.b;
+  assert.ok(recognition(after(withStyle('hsp', 'secure')), 'gaslighting') < recognition(after('borderline'), 'gaslighting'));
 });
 
 test('love bombing hooks the target and the next hurtful card hits twice', () => {
@@ -143,20 +149,22 @@ test('the hook is not spent on a card that cannot hurt esteem', () => {
   assert.equal(applyCard(zero, 'a', 'devaluation').event.doubled, false, 'nothing left to double');
 });
 
-test('cold types barely attach: a psychopath gains less trust from repair than a secure partner', () => {
-  const toPsycho = applyCard(initState('secure', 'psychopath'), 'a', 'repair').event.delta.target.trust;
-  const toSecure = applyCard(initState('hsp', 'secure'), 'a', 'repair').event.delta.target.trust;
+test('cold types barely attach: a psychopath gains less trust from repair than a securely attached partner', () => {
+  const toPsycho = applyCard(initState('hsp', 'psychopath'), 'a', 'repair').event.delta.target.trust;
+  const toSecure = applyCard(initState('borderline', withStyle('hsp', 'secure')), 'a', 'repair').event.delta.target.trust;
   assert.ok(toPsycho < toSecure);
 });
 
-test('rejection sensitivity: withdrawal hurts an anxious partner more than a secure one', () => {
-  const toAnxious = applyCard(initState('avoidant', 'anxious-preoccupied'), 'a', 'ghosting').event.delta.target;
-  const toSecure = applyCard(initState('avoidant', 'secure'), 'a', 'ghosting').event.delta.target;
-  assert.ok(toAnxious.esteem + toAnxious.trust < toSecure.esteem + toSecure.trust);
+test('rejection sensitivity: withdrawal hurts an anxiously attached partner more than a securely attached one', () => {
+  const hit = (attachment) => {
+    const d = applyCard(initState('machiavellian', withStyle('hsp', attachment)), 'a', 'ghosting').event.delta.target;
+    return d.esteem + d.trust;
+  };
+  assert.ok(hit('anxious-preoccupied') < hit('secure'));
 });
 
 test('similar dark partners take manipulation softer; a psychopath stays the harshest', () => {
-  assert.equal(similarity('secure', 'psychopath'), 1);
+  assert.equal(similarity('hsp', 'psychopath'), 1);
   assert.ok(similarity('grandiose-narcissist', 'vulnerable-narcissist') < similarity('machiavellian', 'dark-empath'));
   assert.ok(similarity('psychopath', 'machiavellian') > similarity('machiavellian', 'psychopath'));
   const onDark = applyCard(initState('machiavellian', 'dark-empath'), 'a', 'gaslighting').event.delta.target.esteem;
@@ -184,8 +192,8 @@ test('judge covers every ending', () => {
 });
 
 test('runDuel is reproducible, alternates sides, has a crisis act and stops in time', () => {
-  const d1 = runDuel('borderline', 'avoidant', { seed: 5 });
-  const d2 = runDuel('borderline', 'avoidant', { seed: 5 });
+  const d1 = runDuel('borderline', 'control-freak', { seed: 5 });
+  const d2 = runDuel('borderline', 'control-freak', { seed: 5 });
   assert.deepEqual(d1.events.map((e) => e.cardId), d2.events.map((e) => e.cardId));
   const plays = cardsOf(d1.events);
   assert.ok(plays.length <= MAX_TURNS && plays.length > 0);
@@ -193,36 +201,40 @@ test('runDuel is reproducible, alternates sides, has a crisis act and stops in t
   d1.events.forEach((e, i) => { if (e.kind !== 'crisis') assert.ok(d1.hands[i].includes(e.cardId), 'played card was in hand'); });
   assert.ok(isOver(d1.final));
   assert.ok(decisiveEvent(d1.events));
-  assert.throws(() => runDuel('nobody', 'secure'), RangeError);
-  const long = runDuel('secure', 'hsp', { seed: 2 });
+  assert.throws(() => runDuel('nobody', 'hsp'), RangeError);
+  assert.throws(() => runDuel('secure', 'hsp'), RangeError, 'attachment styles play only as part of a player');
+  const long = runDuel(withStyle('hsp', 'secure'), withStyle('control-freak', 'secure'), { seed: 2 });
   const crisis = long.events.findIndex((e) => e.kind === 'crisis');
   if (long.final.turn >= ACTS.at(-1).from) assert.equal(cardsOf(long.events.slice(0, crisis)).length, ACTS.at(-1).from);
 });
 
-test('runDuel accepts mixed profiles', () => {
-  const d = runDuel(makeProfile('psychopath', { mix: 'secure', share: 0.3 }), 'hsp', { seed: 9 });
+test('runDuel plays the deck of the profile, borrowed card included', () => {
+  const d = runDuel(withStyle('psychopath', 'secure'), 'hsp', { seed: 9 });
   assert.equal(d.final.a.id, 'psychopath');
   for (const e of cardsOf(d.events)) if (e.side === 'a') assert.ok(d.final.a.deck.includes(e.cardId));
 });
 
 test('chooseCard only plays from the hand', () => {
-  const s = initState('machiavellian', 'secure');
+  const s = initState('machiavellian', 'hsp');
   const hand = ['charm', 'deal', 'guilt_trip'];
   for (let i = 0; i < 20; i += 1) assert.ok(hand.includes(chooseCard(s, 'a', hand, makeRng(i))));
 });
 
-test('tournament: the secure type builds the best unions, the psychopath breaks partners most', () => {
-  const { board, pairs } = tournament(ARCHETYPE_IDS, { runs: 6 });
-  assert.equal(board.length, ARCHETYPE_IDS.length);
-  assert.equal(Object.keys(pairs).length, ARCHETYPE_IDS.length * (ARCHETYPE_IDS.length - 1));
-  for (const s of board) assert.equal(s.games, 6 * 2 * (ARCHETYPE_IDS.length - 1));
-  assert.equal(board[0].id, 'secure', 'ranked by union quality');
+test('tournament of character patterns: the psychopath breaks partners most and builds poor unions', () => {
+  const { board, pairs } = tournament(CHARACTER_IDS, { runs: 6 });
+  assert.equal(board.length, CHARACTER_IDS.length);
+  assert.equal(Object.keys(pairs).length, CHARACTER_IDS.length * (CHARACTER_IDS.length - 1));
+  for (const s of board) assert.equal(s.games, 6 * 2 * (CHARACTER_IDS.length - 1));
+  assert.equal(board[0].id, 'hsp', 'ranked by union quality');
   assert.equal([...board].sort((x, y) => y.broke - x.broke)[0].id, 'psychopath');
-  const psycho = board.findIndex((s) => s.id === 'psychopath');
-  assert.ok(psycho > board.length / 2, 'manipulation does not build relationships');
+  assert.ok(board.findIndex((s) => s.id === 'psychopath') >= board.length / 2, 'manipulation does not build relationships');
+  assert.throws(() => tournament(CHARACTER_IDS, { attachment: 'hsp' }), RangeError);
 });
 
-test('tournament with random admixtures keeps the secure type on top', () => {
-  const { board } = tournament(ARCHETYPE_IDS, { runs: 4, mixed: true, seed: 11 });
-  assert.equal(board[0].id, 'secure');
+test('attachment matters: secure attachment for everyone lifts union quality, fearful-avoidant lowers it', () => {
+  const typical = avgUnion(tournament(CHARACTER_IDS, { runs: 6 }).board);
+  const secure = avgUnion(tournament(CHARACTER_IDS, { runs: 6, attachment: 'secure' }).board);
+  const fearful = avgUnion(tournament(CHARACTER_IDS, { runs: 6, attachment: 'fearful-avoidant' }).board);
+  assert.ok(secure > typical);
+  assert.ok(fearful < secure);
 });

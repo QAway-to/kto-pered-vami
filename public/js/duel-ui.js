@@ -1,41 +1,37 @@
-// «Дуэль тактик» UI: pick two people (a type plus an optional admixture), watch three acts of tactic cards,
+// «Дуэль тактик» UI: pick two people (a character pattern plus an attachment style), watch three acts of tactic cards,
 // see how the relationship ends; run the full tournament.
 
-import { ARCHETYPES, ARCHETYPE_IDS, LAYERS } from './archetypes.js';
+import { ARCHETYPES, CHARACTER_IDS, ATTACHMENT_IDS, ATTACHMENT_MAP, attachmentLabel } from './archetypes.js';
+import { DIM_KEYS, rankArchetypes, attachmentStyle } from './quiz.js';
 import { PERSONA_NAMES } from './lab-data.js';
-import { CARDS, FAMILIES, OUTCOMES, MAX_TURNS, START, ACTS, AXES, AXIS_KEYS, MIX } from './duel-data.js';
-import { runDuel, decisiveEvent, tournament, makeProfile, profileFromQuiz } from './duel-engine.js';
+import { CARDS, FAMILIES, OUTCOMES, MAX_TURNS, START, ACTS, AXES, AXIS_KEYS } from './duel-data.js';
+import { runDuel, decisiveEvent, tournament, makeProfile, profileFromQuiz, typicalAttachment } from './duel-engine.js';
 import { h, mount, store, media } from './ui.js';
 import { track } from './track.js';
 
 const HISTORY_KEY = 'duel-history';
 const STEP_MS = 2200;
-const SHARES = [0.2, 0.25, 0.3];
-const isArchetype = (id) => typeof id === 'string' && Object.hasOwn(ARCHETYPES, id);
+const isCharacter = (id) => CHARACTER_IDS.includes(id);
 const nameOf = (id) => PERSONA_NAMES[id] ?? ARCHETYPES[id].name;
-const pctText = (share) => `${Math.round(share * 100)}%`;
 
 /**
- * `mixA` / `mixB`: the admixture chosen for each slot — '' (none), 'random' or an archetype id — and its share.
- * @type {{a: string|null, b: string|null, mixA: {mix: string, share: number}, mixB: {mix: string, share: number},
- *         me: 'a'|'b'|null, run: any, tour: any, tourMixed: boolean, speed: number}}
- * `me` — the slot the user plays themself, with the profile from their quiz result.
+ * `a` / `b`: character patterns in the slots. `attA` / `attB`: their attachment styles — '' (the pattern's typical one),
+ * 'random' or a style id. `me` — the slot the user plays themself, with the profile from their test result.
+ * @type {{a: string|null, b: string|null, attA: string, attB: string, me: 'a'|'b'|null,
+ *         run: any, tour: any, tourMode: string, tourBase: number|null, speed: number}}
  */
 let state = {
-  a: null, b: null, mixA: { mix: '', share: MIX.default }, mixB: { mix: '', share: MIX.default },
-  me: null, run: null, tour: null, tourMixed: false, speed: 1,
+  a: null, b: null, attA: '', attB: '', me: null, run: null, tour: null, tourMode: 'typical', tourBase: null, speed: 1,
 };
 
 /** Display name of a side: «Вы» for the user's own slot, the persona's first name otherwise. */
 const sideName = (side) => (state.me === side ? 'Вы' : nameOf(state[side]));
 
-const LAYER_OF = Object.fromEntries(Object.entries(LAYERS).flatMap(([layer, l]) => l.ids.map((id) => [id, layer])));
-
-/** The user's profile from the saved quiz result, or null before the test. */
+/** The user's profile from the saved test scores (character pattern + attachment style), or null before the test. */
 function myProfile() {
-  const r = store.get('result', null);
-  if (!Array.isArray(r?.ranked) || !r.ranked.every((x) => isArchetype(x?.id))) return null;
-  return profileFromQuiz(r.ranked, LAYER_OF);
+  const dims = store.get('result', null)?.dims;
+  if (!dims || !DIM_KEYS.every((k) => typeof dims[k] === 'number')) return null;
+  return profileFromQuiz({ ranked: rankArchetypes(dims), attachment: attachmentStyle(dims) });
 }
 let timer = null;
 let scrollToTable = false; // only when a duel starts, never on every step
@@ -45,14 +41,14 @@ function setState(patch) {
   render();
 }
 
-const mixKey = (side) => (side === 'a' ? 'mixA' : 'mixB');
-const NO_MIX = Object.freeze({ mix: '', share: MIX.default });
+const attKey = (side) => (side === 'a' ? 'attA' : 'attB');
+const TYPICAL = '';
 
 /* ---------- history ---------- */
 
 function loadHistory() {
   const list = store.get(HISTORY_KEY, []);
-  return Array.isArray(list) ? list.filter((r) => r && isArchetype(r.a) && isArchetype(r.b)) : [];
+  return Array.isArray(list) ? list.filter((r) => r && isCharacter(r.a) && isCharacter(r.b)) : [];
 }
 
 function saveResult(a, b, result) {
@@ -67,17 +63,11 @@ function stopTimer() {
   timer = null;
 }
 
-/** Turns the slot's choice into a profile; a random admixture is drawn here, once per duel. */
+/** Turns the slot's choice into a profile; a random attachment style is drawn here, once per duel. */
 function resolveProfile(side) {
-  const core = state[side];
-  const { mix, share } = state[mixKey(side)];
-  if (!mix) return makeProfile(core);
-  if (mix === 'random') {
-    const others = ARCHETYPE_IDS.filter((id) => id !== core);
-    const pick = others[Math.floor(Math.random() * others.length)];
-    return makeProfile(core, { mix: pick, share: SHARES[Math.floor(Math.random() * SHARES.length)] });
-  }
-  return makeProfile(core, { mix: mix === core ? null : mix, share });
+  const att = state[attKey(side)];
+  const attachment = att === 'random' ? ATTACHMENT_IDS[Math.floor(Math.random() * ATTACHMENT_IDS.length)] : att || null;
+  return makeProfile(state[side], { attachment });
 }
 
 function start() {
@@ -136,44 +126,43 @@ function skip() {
 function pick(id) {
   if (state.run && !state.run.done) return;
   if (state.a === id || state.b === id) return;
-  // A new core starts without an admixture: the old one may even be the new core itself.
-  if (!state.a) setState({ a: id, mixA: NO_MIX, me: state.me === 'a' ? null : state.me, run: null });
-  else setState({ b: id, mixB: NO_MIX, me: state.me === 'b' ? null : state.me, run: null });
+  // A new character starts with its typical attachment style.
+  if (!state.a) setState({ a: id, attA: TYPICAL, me: state.me === 'a' ? null : state.me, run: null });
+  else setState({ b: id, attB: TYPICAL, me: state.me === 'b' ? null : state.me, run: null });
 }
 
 function clearSlot(slot) {
   if (state.run && !state.run.done) return;
-  setState({ [slot]: null, [mixKey(slot)]: NO_MIX, me: state.me === slot ? null : state.me, run: null });
+  setState({ [slot]: null, [attKey(slot)]: TYPICAL, me: state.me === slot ? null : state.me, run: null });
 }
 
 function swap() {
   if (state.run && !state.run.done) return;
-  setState({ a: state.b, b: state.a, mixA: state.mixB, mixB: state.mixA, me: state.me && (state.me === 'a' ? 'b' : 'a'), run: null });
+  setState({ a: state.b, b: state.a, attA: state.attB, attB: state.attA, me: state.me && (state.me === 'a' ? 'b' : 'a'), run: null });
 }
 
-/** Puts the user into the first free slot (or A), with their quiz core and admixture. */
+/** Puts the user into the first free slot (or A), with their character pattern and attachment style from the test. */
 function playMyself() {
   if (state.run && !state.run.done) return;
   const p = myProfile();
   if (!p) return;
   const side = state.me ?? (!state.a ? 'a' : !state.b ? 'b' : 'a');
   const otherSide = side === 'a' ? 'b' : 'a';
-  const clash = state[otherSide] === p.id ? { [otherSide]: null, [mixKey(otherSide)]: NO_MIX } : {};
+  const clash = state[otherSide] === p.id ? { [otherSide]: null, [attKey(otherSide)]: TYPICAL } : {};
   track('duel_myself', { archetype: p.id });
-  setState({ ...clash, [side]: p.id, [mixKey(side)]: p.mix ? { mix: p.mix, share: p.share } : NO_MIX, me: side, run: null });
+  setState({ ...clash, [side]: p.id, [attKey(side)]: p.attachment, me: side, run: null });
 }
 
-function setMix(side, patch) {
+function setAttachment(side, value) {
   if (state.run && !state.run.done) return;
-  setState({ [mixKey(side)]: { ...state[mixKey(side)], ...patch }, run: null });
+  setState({ [attKey(side)]: value, run: null });
 }
 
 /* ---------- view: pieces ---------- */
 
-/** «Психопат + 25% Надёжный тип» */
+/** «Психопат · избегающая привязанность» */
 function profileLabel(p) {
-  const core = ARCHETYPES[p.id].name;
-  return p.mix ? `${core} + ${pctText(p.share)} ${ARCHETYPES[p.mix].name.toLowerCase()}` : core;
+  return `${ARCHETYPES[p.id].name} · ${attachmentLabel(p.attachment)}`;
 }
 
 function meter(label, value, cls) {
@@ -272,33 +261,27 @@ function cardView(event, { big = true } = {}) {
 
 /* ---------- view: screens ---------- */
 
-function mixControls(side) {
+function attachmentControls(side) {
   const id = state[side];
-  const { mix, share } = state[mixKey(side)];
-  const locked = state.run && !state.run.done;
-  const lock = locked ? { disabled: '' } : {};
-  const options = [
-    { value: '', label: 'Без примеси' },
-    { value: 'random', label: 'Случайная примесь' },
-    ...ARCHETYPE_IDS.filter((x) => x !== id).map((x) => ({ value: x, label: `+ ${ARCHETYPES[x].name}` })),
-  ];
-  const select = h('select', {
-    class: 'duel-mix-select',
-    attrs: { 'aria-label': 'Примесь второго типа', ...lock },
-    on: { change: (e) => setMix(side, { mix: e.target.value }) },
-  }, options.map((o) => h('option', { attrs: { value: o.value, ...(o.value === mix ? { selected: '' } : {}) }, text: o.label })));
-  const shares = mix && mix !== 'random' && h('div', { class: 'duel-mix-shares' }, SHARES.map((s) => h('button', {
-    class: `chip ${s === share ? 'is-active' : ''}`,
+  const chosen = state[attKey(side)];
+  const lock = state.run && !state.run.done ? { disabled: '' } : {};
+  const typical = typicalAttachment(id);
+  const option = (value, label) => h('button', {
+    class: `chip ${chosen === value ? 'is-active' : ''}`,
     attrs: lock,
-    text: pctText(s),
-    on: { click: () => setMix(side, { share: s }) },
-  })));
-  const preview = mix && mix !== 'random' && mix !== id ? makeProfile(id, { mix, share }) : makeProfile(id);
+    text: label,
+    on: { click: () => setAttachment(side, value) },
+  });
+  const preview = makeProfile(id, { attachment: chosen && chosen !== 'random' ? chosen : null });
   return h('div', { class: 'duel-mix' }, [
-    select,
-    shares,
-    preview.borrowed.length > 0 && h('p', { class: 'muted small', text: `Берёт из примеси карту «${CARDS[preview.borrowed[0]].name}»` }),
-    mix === 'random' && h('p', { class: 'muted small', text: 'Второй тип и доля 20–30% выпадут при старте' }),
+    h('span', { class: 'duel-mix-label', text: 'Привязанность' }),
+    h('div', { class: 'duel-mix-shares' }, [
+      option(TYPICAL, `типичная: ${ATTACHMENT_MAP[typical].short}`),
+      ...ATTACHMENT_IDS.filter((x) => x !== typical).map((x) => option(x, ATTACHMENT_MAP[x].short)),
+      option('random', 'случайная'),
+    ]),
+    preview.borrowed.length > 0 && chosen !== 'random' && h('p', { class: 'muted small', text: `Из стиля привязанности — карта «${CARDS[preview.borrowed[0]].name}»` }),
+    chosen === 'random' && h('p', { class: 'muted small', text: 'Стиль выпадет при старте' }),
     axesView(preview.axes, ARCHETYPES[id].color),
   ]);
 }
@@ -307,7 +290,7 @@ function myCta(locked) {
   const p = myProfile();
   if (!p) {
     return h('div', { class: 'duel-me' }, [
-      h('p', { class: 'muted small', text: 'Пройдите тест — и сыграйте собой: ваш тип станет ядром, а ближайший тип другого слоя — примесью.' }),
+      h('p', { class: 'muted small', text: 'Пройдите тест — и сыграйте собой: ваш паттерн характера и ваш стиль привязанности.' }),
       h('button', { class: 'btn btn-ghost', text: 'Пройти тест', on: { click: () => document.querySelector('[data-go="test"]')?.click() } }),
     ]);
   }
@@ -338,14 +321,14 @@ function picker() {
         attrs: { title: 'Убрать', ...(locked ? { disabled: '' } : {}) },
         on: { click: () => clearSlot(side) },
       }, [media(id, 'media-duel-lg'), h('strong', { text: sideName(side) }), h('span', { class: 'muted', text: state.me === side ? `Ваш профиль: ${ARCHETYPES[id].name}` : ARCHETYPES[id].name })]),
-      mixControls(side),
+      attachmentControls(side),
     ]);
   };
   return h('div', {}, [
     h('div', { class: 'duel-versus' }, [slot('a'), h('span', { class: 'duel-vs', text: 'vs' }), slot('b')]),
     myCta(locked),
-    h('p', { class: 'muted small duel-mix-note', text: 'Чистых типов не бывает: личность — это точка на непрерывных шкалах (Haslam et al., 2012). Добавьте 20–30% второго типа — например, стиль привязанности к характеру — и посмотрите, как изменится игра.' }),
-    h('div', { class: 'roster' }, ARCHETYPE_IDS.map((id) => {
+    h('p', { class: 'muted small duel-mix-note', text: 'Каждый игрок — паттерн характера плюс стиль привязанности. Привязанность — отдельный модуль: при любом характере она может быть любой и заметно меняет игру. Попробуйте одного и того же психопата с надёжной и с дезорганизованной привязанностью.' }),
+    h('div', { class: 'roster' }, CHARACTER_IDS.map((id) => {
       const taken = state.a === id || state.b === id;
       return h('button', {
         class: `roster-item ${taken ? 'is-taken' : ''}`,
@@ -426,13 +409,14 @@ function resultView() {
 
 function tournamentView() {
   const { tour } = state;
-  const runButtons = h('div', { class: 'row' }, [
-    h('button', { class: 'btn btn-ghost', text: 'Чистые типы', on: { click: () => runTournament(false) } }),
-    h('button', { class: 'btn btn-ghost', text: 'Со случайными примесями', on: { click: () => runTournament(true) } }),
-  ]);
+  const runButtons = h('div', { class: 'row' }, Object.entries(TOUR_MODES).map(([mode, m]) => h('button', {
+    class: `btn ${tour && state.tourMode === mode ? 'btn-primary' : 'btn-ghost'}`,
+    text: m.button,
+    on: { click: () => runTournament(mode) },
+  })));
   if (!tour) {
     return h('div', { class: 'duel-tour-cta' }, [
-      h('p', { class: 'muted', text: `Все ${ARCHETYPE_IDS.length} типов играют друг с другом по 20 дуэлей в трёх актах — кто строит отношения, а кто только перетягивает одеяло.` }),
+      h('p', { class: 'muted', text: `Все ${CHARACTER_IDS.length} паттернов характера играют друг с другом по 20 дуэлей в трёх актах — кто строит отношения, а кто только перетягивает одеяло. Запустите с типичной привязанностью, а потом всем надёжную — и сравните.` }),
       runButtons,
     ]);
   }
@@ -441,9 +425,9 @@ function tournamentView() {
   const dominant = [...tour.board].sort((x, y) => y.wins - x.wins)[0];
   return h('div', {}, [
     h('p', { class: 'note', text: `Лучше всех отношения строит ${ARCHETYPES[best.id].name.toLowerCase()}. Чаще всех доминирует ${ARCHETYPES[dominant.id].name.toLowerCase()}, но по качеству союза он ${tour.board.indexOf(dominant) + 1}-й из ${tour.board.length}: манипуляция выигрывает спринт и проигрывает отношения.` }),
-    h('p', { class: 'muted small', text: state.tourMixed ? 'Режим: у каждого игрока в каждой дуэли случайная примесь 20–30%.' : 'Режим: чистые типы.' }),
+    h('p', { class: 'muted small', text: `Режим: ${TOUR_MODES[state.tourMode].label}. Среднее качество союза — ${avgUnion(tour.board)}${state.tourBase != null ? ` против ${state.tourBase} с типичной привязанностью` : ''}.` }),
     h('div', { class: 'matrix-wrap' }, [h('table', { class: 'duel-leaderboard' }, [
-      h('thead', {}, [h('tr', {}, ['#', 'Тип', 'Качество союза', 'Здоровый', 'По расчёту', 'Сохраняет себя', 'Доминирует'].map((t) => h('th', { text: t })))]),
+      h('thead', {}, [h('tr', {}, ['#', 'Паттерн', 'Качество союза', 'Здоровый', 'По расчёту', 'Сохраняет себя', 'Доминирует'].map((t) => h('th', { text: t })))]),
       h('tbody', {}, tour.board.map((s, i) => h('tr', {}, [
         h('td', { text: String(i + 1) }),
         h('td', {}, [h('div', { class: 'duel-lb-name' }, [media(s.id, 'media-xs'), h('span', { text: ARCHETYPES[s.id].name })])]),
@@ -460,10 +444,22 @@ function tournamentView() {
   ]);
 }
 
-function runTournament(mixed) {
-  const t = tournament(ARCHETYPE_IDS, { runs: 20, mixed, seed: mixed ? Math.floor(Math.random() * 1e6) : 7 });
+const TOUR_MODES = {
+  typical: { button: 'Типичная привязанность', label: 'у каждого паттерна его типичный стиль привязанности' },
+  secure: { button: 'Всем надёжную', label: 'у всех надёжная привязанность' },
+  random: { button: 'Случайная', label: 'в каждой дуэли случайный стиль привязанности' },
+};
+
+const avgUnion = (board) => Math.round(board.reduce((s, x) => s + x.union, 0) / board.length);
+
+let typicalBoard = null; // the typical-attachment run is deterministic (seed 7), so it is computed once
+
+function runTournament(mode) {
+  const run = (attachment) => tournament(CHARACTER_IDS, { runs: 20, attachment, seed: attachment === 'random' ? Math.floor(Math.random() * 1e6) : 7 });
+  typicalBoard ??= run('typical').board;
+  const t = mode === 'typical' ? { board: typicalBoard } : run(mode);
   track('duel_tournament');
-  setState({ tour: t, tourMixed: mixed });
+  setState({ tour: t, tourMode: mode, tourBase: mode === 'typical' ? null : avgUnion(typicalBoard) });
 }
 
 function matrixView() {
@@ -471,10 +467,10 @@ function matrixView() {
   if (history.length === 0) return h('p', { class: 'muted small', text: 'Здесь появится матрица ваших дуэлей «кто кого».' });
   const latest = new Map();
   for (const r of history) if (!latest.has(`${r.a}|${r.b}`)) latest.set(`${r.a}|${r.b}`, r);
-  const head = h('tr', {}, [h('th', { text: 'A ↓  B →' }), ...ARCHETYPE_IDS.map((id) => h('th', { attrs: { title: ARCHETYPES[id].name } }, [media(id, 'media-xs')]))]);
-  const rows = ARCHETYPE_IDS.map((rowId) => h('tr', {}, [
+  const head = h('tr', {}, [h('th', { text: 'A ↓  B →' }), ...CHARACTER_IDS.map((id) => h('th', { attrs: { title: ARCHETYPES[id].name } }, [media(id, 'media-xs')]))]);
+  const rows = CHARACTER_IDS.map((rowId) => h('tr', {}, [
     h('th', { attrs: { title: ARCHETYPES[rowId].name } }, [media(rowId, 'media-xs')]),
-    ...ARCHETYPE_IDS.map((colId) => {
+    ...CHARACTER_IDS.map((colId) => {
       if (rowId === colId) return h('td', { class: 'cell-self' });
       const r = latest.get(`${rowId}|${colId}`);
       const cls = !r ? 'cell-empty' : r.winner === 'a' ? 'cell-a' : r.winner === 'b' ? 'cell-b' : 'cell-draw';
@@ -482,7 +478,7 @@ function matrixView() {
         class: `cell ${cls}`,
         text: r ? OUTCOMES[r.outcome].label.slice(0, 1) : '',
         attrs: { title: `${ARCHETYPES[rowId].name} vs ${ARCHETYPES[colId].name}${r ? `: ${OUTCOMES[r.outcome].label}` : ''}` },
-        on: { click: () => { if (!state.run || state.run.done) setState({ a: rowId, b: colId, mixA: NO_MIX, mixB: NO_MIX, me: null, run: null }); } },
+        on: { click: () => { if (!state.run || state.run.done) setState({ a: rowId, b: colId, attA: TYPICAL, attB: TYPICAL, me: null, run: null }); } },
       });
     }),
   ]));
@@ -519,10 +515,14 @@ function render() {
   }
 }
 
-/** @param {string} [presetId] - archetype to put into slot A */
+/** @param {string} [presetId] - a character pattern for slot A, or an attachment style for player A */
 export function renderDuel(presetId) {
-  if (isArchetype(presetId) && (!state.run || state.run.done)) {
-    state = { ...state, a: presetId, mixA: NO_MIX, me: null, ...(state.b === presetId ? { b: null, mixB: NO_MIX } : {}), run: null };
+  if (!state.run || state.run.done) {
+    if (isCharacter(presetId)) {
+      state = { ...state, a: presetId, attA: TYPICAL, me: null, ...(state.b === presetId ? { b: null, attB: TYPICAL } : {}), run: null };
+    } else if (ATTACHMENT_IDS.includes(presetId)) {
+      state = { ...state, attA: presetId, me: null, run: null };
+    }
   }
   render();
 }

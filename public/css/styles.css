@@ -998,3 +998,40 @@ p, li, .lead, .msg, .arch-tagline, .slot-motive, .note, .feedback {
 
 .duel-me { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
 .duel-me p { margin: 0; flex: 1 1 220px; }
+
+/* ---------- attachment module ---------- */
+.attach-block {
+  grid-column: 1 / -1; margin-top: 24px; padding: 20px; border-radius: var(--r-lg);
+  background: var(--surface-soft); border: 1px solid var(--hairline);
+}
+.attach-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap: 20px; align-items: center; margin-bottom: 16px; }
+.attach-head h2 { margin: 4px 0; }
+.attach-head p { margin: 0; }
+.attach-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.att-map { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; gap: 4px 6px; }
+.att-axis { font-size: 11px; color: var(--muted); }
+.att-axis-y { writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; align-self: center; }
+.att-axis-x { grid-column: 2; text-align: right; }
+.att-plot { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.att-cell {
+  display: flex; flex-direction: column; gap: 2px; min-height: 64px; padding: 8px 10px; text-align: left;
+  border-radius: var(--r-md, 10px); border: 1px solid var(--hairline); color: var(--ink); font: inherit;
+  background: color-mix(in srgb, var(--c) 10%, var(--surface-card));
+}
+button.att-cell { cursor: pointer; }
+button.att-cell:hover { border-color: var(--c); }
+.att-cell strong { font-size: 13px; }
+.att-cell.is-active { border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 22%, var(--surface-card)); }
+.att-dot {
+  position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  background: var(--ink); border: 2px solid var(--surface-card); box-shadow: 0 1px 4px rgba(0, 0, 0, .3); pointer-events: none;
+}
+.attach-result-body { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 20px; align-items: center; margin-top: 8px; }
+.attach-result-body h2 { margin: 0 0 4px; }
+@media (max-width: 760px) {
+  .attach-head, .attach-result-body { grid-template-columns: minmax(0, 1fr); }
+  .attach-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .attach-block { padding: 14px; }
+}
+
+.duel-mix-label { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }

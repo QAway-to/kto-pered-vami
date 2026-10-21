@@ -273,21 +273,52 @@ export const ARCHETYPES = {
 export const ARCHETYPE_IDS = Object.freeze(Object.keys(ARCHETYPES));
 
 /**
- * Two layers, not one list: everyone has an attachment style on top of their character, and the two mix
+ * Two layers, not one list: everyone has a character and, separately, an attachment style
  * (Bartholomew & Horowitz, 1991; types are prototypes on continuous dimensions, Haslam et al., 2012).
  */
 export const LAYERS = Object.freeze({
   character: {
-    title: 'Характер',
-    desc: 'Как человек обращается с партнёром: от манипуляций до чуткости.',
+    title: 'Паттерны характера',
+    desc: 'Как человек обращается с партнёром: от манипуляций до чуткости. Здоровый характер — это невысокие значения по всем паттернам, поэтому отдельного «нормального» паттерна здесь нет.',
     ids: ['dark-empath', 'grandiose-narcissist', 'vulnerable-narcissist', 'machiavellian', 'psychopath', 'borderline', 'hsp', 'control-freak'],
   },
   attachment: {
-    title: 'Привязанность',
-    desc: 'Как человек сближается. Стиль привязанности есть у каждого и смешивается с характером.',
+    title: 'Стиль привязанности',
+    desc: 'Отдельный модуль: как человек сближается. Стиль есть у каждого, при любом характере, и определяется двумя шкалами — тревогой и избеганием.',
     ids: ['secure', 'anxious-preoccupied', 'avoidant', 'fearful-avoidant'],
   },
 });
+
+export const CHARACTER_IDS = LAYERS.character.ids;
+export const ATTACHMENT_IDS = LAYERS.attachment.ids;
+
+/**
+ * Attachment styles are the four quadrants of two dimensions (ECR: Brennan, Clark & Shaver, 1998):
+ * anxiety (fear of being left) and avoidance (discomfort with closeness).
+ */
+export const ATTACHMENT_MAP = Object.freeze({
+  secure: { anxiety: 'low', avoidance: 'low', short: 'надёжная' },
+  'anxious-preoccupied': { anxiety: 'high', avoidance: 'low', short: 'тревожная' },
+  avoidant: { anxiety: 'low', avoidance: 'high', short: 'избегающая' },
+  'fearful-avoidant': { anxiety: 'high', avoidance: 'high', short: 'дезорганизованная' },
+});
+
+/** Above the scale midpoint counts as high; answering «Отчасти» to everything lands in the secure quadrant. */
+const HIGH = 0.5;
+
+/**
+ * @param {number} anxiety - 0..1
+ * @param {number} avoidance - 0..1
+ * @returns {string} attachment style id
+ */
+export function attachmentQuadrant(anxiety, avoidance) {
+  const anx = anxiety > HIGH ? 'high' : 'low';
+  const avo = avoidance > HIGH ? 'high' : 'low';
+  return ATTACHMENT_IDS.find((id) => ATTACHMENT_MAP[id].anxiety === anx && ATTACHMENT_MAP[id].avoidance === avo);
+}
+
+/** «надёжная привязанность» */
+export const attachmentLabel = (id) => `${ATTACHMENT_MAP[id].short} привязанность`;
 
 export const ARCHETYPE_SLUGS = Object.freeze({
   'dark-empath': 'dark-empath',

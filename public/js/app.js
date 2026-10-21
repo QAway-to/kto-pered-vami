@@ -1,7 +1,7 @@
-import { ARCHETYPES, ARCHETYPE_IDS, ARCHETYPE_SLUGS, LAYERS, TRAIT_DEFINITIONS, TRAIT_KEYS } from './archetypes.js';
-import { QUESTIONS, LIKERT, DIMENSIONS, DIM_KEYS, scoreDimensions, rankArchetypes } from './quiz.js';
+import { ARCHETYPES, ARCHETYPE_IDS, ARCHETYPE_SLUGS, LAYERS, ATTACHMENT_IDS, TRAIT_DEFINITIONS, TRAIT_KEYS, attachmentLabel } from './archetypes.js';
+import { QUESTIONS, LIKERT, DIMENSIONS, DIM_KEYS, scoreDimensions, rankArchetypes, attachmentStyle } from './quiz.js';
 import { CASES } from './cases.js';
-import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech, isAuthError } from './ui.js';
+import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech, isAuthError, attachmentMap } from './ui.js';
 import { initAuth } from './auth.js';
 import { SCENARIO_IDS, SCENARIOS, randomIntro } from './lab-data.js';
 import { renderArena } from './arena.js';
@@ -18,10 +18,16 @@ function loadSparHistory() {
   return Array.isArray(list) ? list.filter((e) => SKILL_KEYS.every((k) => isScore(e?.scores?.[k]))) : [];
 }
 
-/** Saved test result, or null if missing or made with archetypes that no longer exist. */
+/** Builds the test result from the scale scores: closest character pattern and, separately, the attachment style. */
+function resultFromDims(dims) {
+  return { dims, ranked: rankArchetypes(dims), attachment: attachmentStyle(dims) };
+}
+
+/** Saved test result, rebuilt from its scale scores so results from older versions of the model still work. */
 function loadResult() {
-  const r = store.get('result', null);
-  return r?.ranked?.every((x) => x.id in ARCHETYPES) ? r : null;
+  const dims = store.get('result', null)?.dims;
+  const valid = dims && DIM_KEYS.every((k) => typeof dims[k] === 'number' && dims[k] >= 0 && dims[k] <= 1);
+  return valid ? resultFromDims(dims) : null;
 }
 
 /* ---------- Telegram Mini App ---------- */
@@ -165,7 +171,7 @@ function renderHome() {
   const skill = level(loadSparHistory());
   mount(
     'stats',
-    h('span', { class: 'pill', text: my ? `Вам ближе: ${chip(my.ranked[0].id)}` : 'Тест ещё не пройден' }),
+    h('span', { class: 'pill', text: my ? `Вам ближе: ${chip(my.ranked[0].id)} · ${attachmentLabel(my.attachment.id)}` : 'Тест ещё не пройден' }),
     h('span', { class: 'pill', text: `Красные флаги: ${cases.right}/${cases.total}` }),
     h('span', { class: 'pill', text: `Профайлинг: ${dialogs.right}/${dialogs.total}` }),
     skill != null && h('span', { class: 'pill pill-accent', text: `Навык: ${skill}/10` }),
@@ -194,10 +200,24 @@ function renderHome() {
       ]),
     ]);
   };
-  mount('archetype-grid', ...Object.values(LAYERS).flatMap((layer) => [
-    h('div', { class: 'arch-layer-head' }, [h('h2', { text: layer.title }), h('p', { class: 'muted', text: layer.desc })]),
-    ...layer.ids.map(card),
-  ]));
+  const { character, attachment } = LAYERS;
+  mount(
+    'archetype-grid',
+    h('div', { class: 'arch-layer-head' }, [h('h2', { text: character.title }), h('p', { class: 'muted', text: character.desc })]),
+    ...character.ids.map(card),
+    // Attachment is its own module: a 2×2 map of two scales, then the four styles.
+    h('section', { class: 'attach-block' }, [
+      h('div', { class: 'attach-head' }, [
+        h('div', {}, [
+          h('span', { class: 'eyebrow', text: 'Отдельный модуль' }),
+          h('h2', { text: attachment.title }),
+          h('p', { class: 'muted', text: attachment.desc }),
+        ]),
+        attachmentMap({ active: my?.attachment.id, dot: my?.attachment, onPick: (id) => go('type', id) }),
+      ]),
+      h('div', { class: 'attach-cards' }, attachment.ids.map(card)),
+    ]),
+  );
 }
 
 /* ---------- archetype detail ---------- */
@@ -253,6 +273,11 @@ function renderType(id) {
         ]);
       })),
     ]),
+    ATTACHMENT_IDS.includes(id) && h('div', { class: 'card attach-card' }, [
+      h('h3', { text: 'Место на карте привязанности' }),
+      h('p', { class: 'muted small', text: 'Стиль привязанности — отдельный модуль: он есть у каждого, при любом паттерне характера, и определяется двумя шкалами.' }),
+      attachmentMap({ active: id, onPick: (x) => go('type', x) }),
+    ]),
     h('div', { class: 'card' }, [h('h3', { text: 'Научная основа' }), h('p', { text: a.science })]),
     h('div', { class: 'grid' }, [
       h('div', { class: 'card' }, [h('h3', { text: 'Как распознать' }), list(a.signs)]),
@@ -295,11 +320,29 @@ function answerTest(value) {
   testState = { i: testState.i + 1, answers: [...testState.answers, value] };
   if (testState.i < QUESTIONS.length) return renderTest();
   const dims = scoreDimensions(testState.answers);
-  const result = { dims, ranked: rankArchetypes(dims) };
+  const result = resultFromDims(dims);
   store.set('result', result);
-  track('test_completed', { archetype: result.ranked[0].id });
+  track('test_completed', { archetype: result.ranked[0].id, attachment: result.attachment.id });
   testState = null;
   return renderTestResult(result);
+}
+
+/** The attachment half of the result: a point on the 2×2 map and the style it falls into. */
+function attachmentResult(att) {
+  const a = ARCHETYPES[att.id];
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  return h('section', { class: 'card attach-card attach-result' }, [
+    h('span', { class: 'eyebrow', text: 'Отдельный модуль · стиль привязанности' }),
+    h('div', { class: 'attach-result-body' }, [
+      attachmentMap({ active: att.id, dot: att, onPick: (id) => go('type', id) }),
+      h('div', {}, [
+        h('h2', { text: a.name }),
+        h('p', { text: a.tagline }),
+        h('p', { class: 'muted small', text: `Тревога ${pct(att.anxiety)} · избегание ${pct(att.avoidance)}. Стиль — это квадрант на этих двух шкалах, а не отдельный тип; он меняется с опытом и в надёжных отношениях.` }),
+        h('button', { class: 'btn btn-ghost', text: 'Подробнее о стиле', on: { click: () => go('type', att.id) } }),
+      ]),
+    ]),
+  ]);
 }
 
 function renderTestResult(result) {
@@ -311,13 +354,14 @@ function renderTestResult(result) {
     h('div', { class: 'result-hero' }, [
       media(top.id, 'media-lg'),
       h('div', {}, [
-        h('span', { class: 'eyebrow', text: `Ваш стиль ближе всего к · ${top.match}%` }),
+        h('span', { class: 'eyebrow', text: `Паттерн характера · совпадение ${top.match}%` }),
         h('h1', { class: 'display', text: a.name }),
         h('p', { text: a.tagline }),
         h('p', { class: 'small', text: 'Это описание стиля поведения по результатам скрининга, а не диагноз и не оценка вас как человека.' }),
         h('button', { class: 'btn btn-primary', text: 'Подробнее об архетипе', on: { click: () => go('type', top.id) } }),
       ]),
     ]),
+    attachmentResult(result.attachment),
     h('h2', { text: 'Также близки' }),
     h('div', { class: 'row' }, rest.slice(0, 3).map((r) => h('button', {
       class: 'pill pill-link',
@@ -334,7 +378,7 @@ function renderTestResult(result) {
       ]);
     })),
     showHelp && h('p', { class: 'note', text: 'У вас выражены эмоциональные перепады. Это не диагноз, но если они мешают жить и отношениям, стоит поговорить с психологом или психотерапевтом.' }),
-    h('p', { class: 'muted small', text: 'Скрининг из 26 утверждений по 13 научным конструктам. Это не клиническая диагностика: результат показывает выраженность черт сегодня, а не ярлык навсегда.' }),
+    h('p', { class: 'muted small', text: `Скрининг из ${QUESTIONS.length} утверждений по ${DIM_KEYS.length} научным конструктам. Это не клиническая диагностика: результат показывает выраженность черт сегодня, а не ярлык навсегда.` }),
     h('div', { class: 'row' }, [
       h('button', { class: 'btn btn-primary', text: 'Тренироваться на красных флагах', on: { click: () => go('cases') } }),
       h('button', { class: 'btn btn-ghost', text: 'Пройти заново', on: { click: () => { store.set('result', null); testState = null; renderTest(); } } }),
