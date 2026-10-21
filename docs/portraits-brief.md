@@ -1,57 +1,83 @@
-# Портреты для двух новых архетипов
+# Портреты архетипов: единый стиль
 
-Задание для Antigravity или любого генератора. Нужны два портрета в стиле остальных карточек из `public/img/archetypes/`. Главный референс — `borderline.webp`: та же студия, тот же уровень детализации.
+Стандарт для любого агента или человека, который делает портрет персонажа (Antigravity, Gemini, Claude, вручную).
 
-## Общие требования
+Цель: каждый новый портрет выглядит так, будто его нарисовала та же студия, что и остальные карточки в `public/img/archetypes/`.
 
-- **Формат:** 640 × 800 (4:5), WebP, качество 85, до 80 КБ.
-- **Кадр:** портрет по грудь, лицо в верхней половине кадра, взгляд в камеру или чуть мимо.
-- **Стиль:** stylized 2.5D concept art, «Pixar meets editorial illustration». Мягкие формы, выразительная мимика, насыщенный цвет, кинематографичный свет, живописный фон-символ (как вихрь у пограничного типа). Без фотореализма и без аниме.
-- **Нельзя:** текст, логотипы, водяные знаки, лишние люди, лишние пальцы, сексуализация.
-- **Куда класть:**
-  - `public/img/archetypes/anxious-preoccupied.webp`
-  - `public/img/archetypes/fearful-avoidant.webp`
+## Три правила, без которых стиль расползается
 
-  Затем убрать оба id из `IMAGES_PENDING` в `public/js/archetypes.js`. Тест `every archetype with artwork has its portrait file on disk` проверит, что файлы на месте.
+1. **Всегда прикладывай картинку-референс.** Это `public/img/archetypes/dark-empath.webp`, один и тот же файл для каждого портрета. Стиль держит картинка, а не слова. По одному тексту каждая генерация уходит в свою сторону; именно поэтому старые портреты получались разными. Если инструмент не принимает WebP, сначала сконвертируй референс в PNG.
+2. **Референс — только для стиля.** В промпте обязательно должна быть фраза «STYLE REFERENCE ONLY… Do NOT copy the reference person's face, hair, earrings or clothes». Иначе модель нарисует того же человека в другой одежде.
+3. **Не меняй стилевой блок.** Меняется только описание человека и цвет фона. Свет, кадр, формат и манера всегда одни и те же.
 
-**Общий префикс промпта:**
+## Промпт-шаблон
+
+Копируй целиком и подставляй описание в последний абзац. Промпт пишется на английском: модели держат стиль на нём стабильнее.
 
 ```
-Stylized 2.5D concept art portrait, Pixar-meets-editorial illustration, chest-up, 4:5 vertical,
-expressive face, rich saturated colors, cinematic warm key light from top-left, soft cool rim light,
-painterly symbolic background, high detail hair and fabric, no text, no watermark, single person
+The attached image is the STYLE REFERENCE ONLY. Paint a new portrait in exactly the same style and rendering:
+stylized 2.5D digital painting, Pixar-meets-editorial illustration, soft painterly skin, large expressive eyes,
+warm cinematic side light with a soft glow, smooth softly blurred gradient background, chest-up framing with the face
+in the upper half, slight head tilt, vertical 4:5. Do NOT copy the reference person's face, hair, earrings or clothes:
+draw a completely different person as described below. No text, no logos, no watermark, exactly one person.
+
+<PERSON>
 ```
 
-## 1. Тревожный тип — Ника, 28 лет, SMM-менеджер
+### Что писать в `<PERSON>`
 
-Цвет карточки `#c98a3a` (тёплый янтарь). Символ — телефон и ожидание ответа.
+Пиши 4–5 предложений, по пунктам ниже. Больше не нужно: длинное описание вытесняет стиль.
+
+- **Кто:** возраст, пол, имя. Имя из `PERSONA_NAMES` в `public/js/lab-data.js`; биография — в `src/personas.js`.
+- **Внешность:** волосы, глаза, одна-две приметы (веснушки, щетина).
+- **Выражение лица, которое показывает паттерн типа.** Это главное в портрете: тревога в глазах, взгляд «свысока», настороженная улыбка.
+- **Одежда и ровно один предмет-символ:** телефон, фотоаппарат, кружка.
+- **Фон:** «blurred gradient» в цвете карточки типа (`color` в `public/js/archetypes.js`).
+- **Настроение:** одна фраза.
+
+Чего нельзя:
+- карикатура и «злодейство»;
+- сексуализация;
+- оружие и кровь;
+- символические сцены на фоне (вихри, предметы, другие люди);
+- текст в кадре.
+
+## Как генерировать
+
+- **Antigravity:** встроенная генерация картинок. Приложи `dark-empath.webp` как изображение и вставь промпт целиком.
+- **Gemini API:** модель `gemini-3-pro-image`, aspect ratio `4:5`, `responseModalities: ['IMAGE']`, референс — `inline_data`. Ключ никогда не вставляй в код и в чат.
+- Делай 2 варианта и выбирай тот, где паттерн типа лучше читается по лицу.
+
+## Технические требования к файлу
+
+- **Формат:** WebP, 640 × 800, качество около 82, до 80 КБ. Обрезка от верха, чтобы не потерять макушку.
+- **Путь:** `public/img/archetypes/<id>.webp`, где `<id>` — ключ архетипа из `ARCHETYPES` в `public/js/archetypes.js`.
+- **Подключение:** если id стоит в `IMAGES_PENDING` в `public/js/archetypes.js`, убери его оттуда.
+- **Проверка:** `npm test`. Тест «every archetype with artwork has its portrait file on disk» проверит, что файл на месте.
+
+## Проверка перед коммитом
+
+- Поставь портрет рядом с `dark-empath.webp`: свет, мягкость кожи и фон должны совпадать.
+- В кружке 64 × 64 (ростер Арены) лицо узнаётся.
+- Фон перекликается с цветом карточки типа.
+- В коммит идут только файл портрета и правка `archetypes.js`. Не используй `git add -A`: в этой папке параллельно работают другие агенты.
+
+## Примеры, сделанные по этому стандарту
+
+### Ника — тревожный тип (`anxious-preoccupied`)
 
 ```
-<prefix>, a 28-year-old woman, warm honey-brown wavy hair loosely tied, soft freckles, big hopeful
-but worried eyes looking slightly up, gentle half-smile with tension in the brows, cozy oversized
-amber knit sweater, holding a smartphone close to her chest with both hands, the screen glows softly
-with three typing dots, background: swirling warm amber and peach clouds with tiny floating message
-bubbles fading into the distance, a single small clock in the bokeh, mood: tender, anxious waiting
+A 28-year-old woman, Nika. Warm honey-brown wavy hair loosely tied with strands falling out,
+light freckles, big hopeful but worried eyes glancing slightly up, a gentle half-smile with tension in the brows.
+Cozy oversized amber knit sweater. She holds a smartphone close to her chest with both hands, the screen glowing softly.
+Background: warm amber-to-peach blurred gradient. Mood: tender, anxious waiting for a reply.
 ```
 
-Что должно читаться: тепло и вовлечённость плюс тревога ожидания. Не жертва и не истерика.
-
-## 2. Дезорганизованный тип — Тимур, 30 лет, фотограф
-
-Цвет карточки `#8a5a72` (пыльная слива). Символ — «иди ко мне / отойди».
+### Тимур — дезорганизованный тип (`fearful-avoidant`)
 
 ```
-<prefix>, a 30-year-old man, dark tousled hair, short stubble, expressive dark eyes with a guarded
-look, one hand reaching slightly toward the viewer, the other arm crossed protectively over his chest,
-vintage film camera on a strap, muted plum and dusty-rose layered jacket over a dark t-shirt,
-background split diagonally: warm rose-gold light on the reaching side, cool slate-blue shadow on the
-guarded side, soft painterly brushstrokes, mood: longing and hesitation at the same time
+A 30-year-old man, Timur. Dark tousled hair, short stubble, expressive dark eyes with a guarded,
+wistful look, a faint smile that does not reach the eyes. Muted plum jacket over a dark t-shirt, a vintage film camera
+on a strap. One arm crossed protectively over his chest. Background: blurred gradient split diagonally, warm rose-gold
+light on one side and cool slate-blue shadow on the other. Mood: longing and hesitation at once.
 ```
-
-Что должно читаться: противоречие «тянется и закрывается» в одной позе. Не злодей и не холодный тип.
-
-## Проверка перед заливкой
-
-- Оба портрета рядом с `borderline.webp` и `avoidant.webp` выглядят как одна серия.
-- В квадратной миниатюре 64 × 64 (ростер Арены) лицо узнаётся.
-- Цвет фона перекликается с цветом карточки.
