@@ -4,7 +4,7 @@ import { CASES } from './cases.js';
 import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech, isAuthError } from './ui.js';
 import { initAuth } from './auth.js';
 import { SCENARIO_IDS, SCENARIOS, randomIntro } from './lab-data.js';
-import { renderLab } from './lab-ui.js';
+import { renderArena } from './arena.js';
 import { track } from './track.js';
 import { SKILL_AXES, SKILL_KEYS, overall, level } from './skill.js';
 
@@ -36,7 +36,7 @@ if (tg && tg.initData !== undefined) {
 /* ---------- navigation ---------- */
 
 const renderers = {
-  home: renderHome, type: renderType, test: renderTest, cases: renderCases, dialog: renderDialog, lab: renderLab,
+  home: renderHome, type: renderType, test: renderTest, cases: renderCases, dialog: renderDialog, lab: renderArena,
 };
 
 function urlFor(tab, arg) {
