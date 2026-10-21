@@ -968,3 +968,30 @@ p, li, .lead, .msg, .arch-tagline, .slot-motive, .note, .feedback {
   .arena-switch { display: flex; }
   .arena-switch-btn { flex: 1; }
 }
+
+/* ---------- archetype layers ---------- */
+.arch-layer-head { grid-column: 1 / -1; margin-top: var(--space-4, 16px); }
+.arch-layer-head:first-child { margin-top: 0; }
+.arch-layer-head h2 { margin: 0 0 4px; }
+.arch-layer-head p { margin: 0; }
+
+/* ---------- duel: admixture, axes, acts ---------- */
+.duel-versus { align-items: start; }
+.duel-slot.is-filled { align-items: stretch; }
+.duel-slot-face { display: flex; flex-direction: column; align-items: center; gap: 6px; border: 0; background: transparent; padding: 0; cursor: pointer; color: inherit; }
+.duel-slot-face:disabled { cursor: default; }
+.duel-mix { display: grid; gap: 6px; text-align: left; margin-top: 6px; }
+.duel-mix p { margin: 0; }
+.duel-mix-select { width: 100%; min-height: 36px; padding: 6px 8px; border-radius: var(--r-md, 10px); border: 1px solid var(--hairline); background: var(--surface-soft); color: var(--ink); font: inherit; font-size: 13px; }
+.duel-mix-shares { display: flex; gap: 6px; flex-wrap: wrap; }
+.duel-mix-shares .chip { padding: 4px 10px; font-size: 12px; }
+.duel-mix-note { margin: 0 0 12px; }
+.duel-axes { display: grid; gap: 3px; margin-top: 2px; }
+.duel-axis { display: grid; grid-template-columns: minmax(0, 1fr) 56px 14px; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); }
+.duel-axis-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.duel-axis-track { height: 5px; border-radius: var(--r-full); background: var(--surface-soft); overflow: hidden; }
+.duel-axis-fill { height: 100%; border-radius: inherit; }
+.duel-axis-value { text-align: right; color: var(--ink); }
+.duel-flag.is-recognized { background: #5a6b7a; }
+.duel-card.is-crisis { border-style: dashed; }
+.duel-log-crisis .duel-log-who { color: #8a6d3b; }

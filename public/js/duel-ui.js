@@ -1,19 +1,29 @@
-// «Дуэль тактик» UI: pick two archetypes, watch their tactic cards play out, see who ate whom; run the full tournament.
+// «Дуэль тактик» UI: pick two people (a type plus an optional admixture), watch three acts of tactic cards,
+// see how the relationship ends; run the full tournament.
 
 import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
 import { PERSONA_NAMES } from './lab-data.js';
-import { CARDS, FAMILIES, OUTCOMES, MAX_TURNS, START } from './duel-data.js';
-import { runDuel, decisiveEvent, tournament } from './duel-engine.js';
+import { CARDS, FAMILIES, OUTCOMES, MAX_TURNS, START, ACTS, AXES, AXIS_KEYS, MIX } from './duel-data.js';
+import { runDuel, decisiveEvent, tournament, makeProfile } from './duel-engine.js';
 import { h, mount, store, media } from './ui.js';
 import { track } from './track.js';
 
 const HISTORY_KEY = 'duel-history';
 const STEP_MS = 2200;
+const SHARES = [0.2, 0.25, 0.3];
 const isArchetype = (id) => typeof id === 'string' && Object.hasOwn(ARCHETYPES, id);
 const nameOf = (id) => PERSONA_NAMES[id] ?? ARCHETYPES[id].name;
+const pctText = (share) => `${Math.round(share * 100)}%`;
 
-/** @type {{a: string|null, b: string|null, run: any, tour: any, speed: number}} */
-let state = { a: null, b: null, run: null, tour: null, speed: 1 };
+/**
+ * `mixA` / `mixB`: the admixture chosen for each slot — '' (none), 'random' or an archetype id — and its share.
+ * @type {{a: string|null, b: string|null, mixA: {mix: string, share: number}, mixB: {mix: string, share: number},
+ *         run: any, tour: any, tourMixed: boolean, speed: number}}
+ */
+let state = {
+  a: null, b: null, mixA: { mix: '', share: MIX.default }, mixB: { mix: '', share: MIX.default },
+  run: null, tour: null, tourMixed: false, speed: 1,
+};
 let timer = null;
 let scrollToTable = false; // only when a duel starts, never on every step
 
@@ -21,6 +31,8 @@ function setState(patch) {
   state = { ...state, ...patch };
   render();
 }
+
+const mixKey = (side) => (side === 'a' ? 'mixA' : 'mixB');
 
 /* ---------- history ---------- */
 
@@ -41,15 +53,29 @@ function stopTimer() {
   timer = null;
 }
 
+/** Turns the slot's choice into a profile; a random admixture is drawn here, once per duel. */
+function resolveProfile(side) {
+  const core = state[side];
+  const { mix, share } = state[mixKey(side)];
+  if (!mix) return makeProfile(core);
+  if (mix === 'random') {
+    const others = ARCHETYPE_IDS.filter((id) => id !== core);
+    const pick = others[Math.floor(Math.random() * others.length)];
+    return makeProfile(core, { mix: pick, share: SHARES[Math.floor(Math.random() * SHARES.length)] });
+  }
+  return makeProfile(core, { mix: mix === core ? null : mix, share });
+}
+
 function start() {
   const { a, b } = state;
   if (!a || !b || a === b) return;
   stopTimer();
   const seed = Math.floor(Math.random() * 2 ** 31);
-  const duel = runDuel(a, b, { seed });
+  const profiles = { a: resolveProfile('a'), b: resolveProfile('b') };
+  const duel = runDuel(profiles.a, profiles.b, { seed });
   track('duel_started', { a, b });
   scrollToTable = true;
-  setState({ run: { ...duel, seed, shown: 0, playing: true } });
+  setState({ run: { ...duel, profiles, seed, shown: 0, playing: true } });
   schedule();
 }
 
@@ -102,15 +128,26 @@ function pick(id) {
 
 function clearSlot(slot) {
   if (state.run && !state.run.done) return;
-  setState({ [slot]: null, run: null });
+  setState({ [slot]: null, [mixKey(slot)]: { mix: '', share: MIX.default }, run: null });
 }
 
 function swap() {
   if (state.run && !state.run.done) return;
-  setState({ a: state.b, b: state.a, run: null });
+  setState({ a: state.b, b: state.a, mixA: state.mixB, mixB: state.mixA, run: null });
+}
+
+function setMix(side, patch) {
+  if (state.run && !state.run.done) return;
+  setState({ [mixKey(side)]: { ...state[mixKey(side)], ...patch }, run: null });
 }
 
 /* ---------- view: pieces ---------- */
+
+/** «Психопат + 25% Надёжный тип» */
+function profileLabel(p) {
+  const core = ARCHETYPES[p.id].name;
+  return p.mix ? `${core} + ${pctText(p.share)} ${ARCHETYPES[p.mix].name.toLowerCase()}` : core;
+}
 
 function meter(label, value, cls) {
   return h('div', { class: `duel-meter ${cls}` }, [
@@ -120,18 +157,34 @@ function meter(label, value, cls) {
   ]);
 }
 
+function axesView(axes, color) {
+  return h('div', { class: 'duel-axes' }, AXIS_KEYS.map((k) => h('div', { class: 'duel-axis', attrs: { title: AXES[k].source } }, [
+    h('span', { class: 'duel-axis-label', text: AXES[k].label }),
+    h('div', { class: 'duel-axis-track' }, [h('div', { class: 'duel-axis-fill', vars: { width: `${axes[k] * 10}%`, background: color } })]),
+    h('span', { class: 'duel-axis-value', text: String(Math.round(axes[k])) }),
+  ])));
+}
+
+/** What this side gained or lost on the last step: a card it played, a card played on it, or the crisis. */
+function deltaFor(side, lastEvent) {
+  if (!lastEvent) return null;
+  if (lastEvent.kind === 'crisis') return lastEvent.delta[side];
+  return lastEvent.side === side ? lastEvent.delta.self : lastEvent.delta.target;
+}
+
 function playerPanel(side, p, lastEvent) {
   const id = state[side];
-  const mine = lastEvent && lastEvent.side === side;
-  const hitMe = lastEvent && lastEvent.side !== side;
-  const delta = lastEvent ? (mine ? lastEvent.delta.self : lastEvent.delta.target) : null;
+  const isCard = lastEvent && lastEvent.kind !== 'crisis';
+  const mine = isCard && lastEvent.side === side;
+  const hitMe = isCard && lastEvent.side !== side;
+  const delta = deltaFor(side, lastEvent);
   const deltaChip = (v, label) => (v ? h('span', { class: `duel-delta ${v > 0 ? 'up' : 'down'}`, text: `${label} ${v > 0 ? '+' : ''}${v}` }) : null);
   return h('div', { class: `duel-player duel-${side} ${mine ? 'is-acting' : ''} ${hitMe ? 'is-target' : ''}` }, [
     media(id, 'media-duel'),
     h('div', { class: 'duel-player-body' }, [
       h('div', { class: 'duel-player-head' }, [
         h('strong', { text: nameOf(id) }),
-        h('span', { class: 'muted', text: ARCHETYPES[id].name }),
+        h('span', { class: 'muted', text: profileLabel(state.run.profiles[side]) }),
       ]),
       meter('Самооценка', p.esteem, 'is-esteem'),
       meter('Доверие', p.trust, 'is-trust'),
@@ -147,20 +200,30 @@ function playerPanel(side, p, lastEvent) {
 
 function effectChips(card) {
   const chips = [];
-  const add = (who, key, label, v) => {
+  const add = (who, label, v) => {
     if (!v) return;
     chips.push(h('span', { class: `duel-fx ${v > 0 ? 'up' : 'down'}`, text: `${who}: ${label} ${v > 0 ? '+' : ''}${v}` }));
   };
-  add('себе', 'esteem', 'самооценка', card.self?.esteem);
-  add('себе', 'trust', 'доверие', card.self?.trust);
-  add('партнёру', 'esteem', 'самооценка', card.target?.esteem);
-  add('партнёру', 'trust', 'доверие', card.target?.trust);
+  add('себе', 'самооценка', card.self?.esteem);
+  add('себе', 'доверие', card.self?.trust);
+  add('партнёру', 'самооценка', card.target?.esteem);
+  add('партнёру', 'доверие', card.target?.trust);
   if (card.hook) chips.push(h('span', { class: 'duel-fx is-hook', text: 'сажает на крючок' }));
   if (card.shield) chips.push(h('span', { class: 'duel-fx is-shield', text: 'ставит границу' }));
   return chips;
 }
 
+function crisisView(event) {
+  return h('div', { class: 'duel-card is-big is-crisis', vars: { '--fam': '#8a6d3b' } }, [
+    h('div', { class: 'duel-card-top' }, [h('span', { class: 'duel-card-family', text: `Акт ${ACTS.length}: ${ACTS.at(-1).name}` })]),
+    h('h3', { class: 'duel-card-name', text: 'Внешний стресс' }),
+    h('p', { class: 'duel-card-line', text: 'Работа, деньги, болезнь близких — удар по обоим. Дальше пару держит только то, что они умеют чинить.' }),
+    h('p', { class: 'duel-card-science', text: `Стресс извне переливается в отношения (Neff & Karney, 2009) · ход ${event.turn}` }),
+  ]);
+}
+
 function cardView(event, { big = true } = {}) {
+  if (event.kind === 'crisis') return crisisView(event);
   const card = CARDS[event.cardId];
   const fam = FAMILIES[card.family];
   const actor = state[event.side];
@@ -172,9 +235,10 @@ function cardView(event, { big = true } = {}) {
     h('h3', { class: 'duel-card-name', text: card.name }),
     h('p', { class: 'duel-card-line', text: card.line }),
     big && h('div', { class: 'duel-card-fx' }, effectChips(card)),
-    (event.blocked || event.doubled) && h('div', { class: 'duel-card-status' }, [
+    (event.blocked || event.doubled || event.recognized) && h('div', { class: 'duel-card-status' }, [
       event.blocked && h('span', { class: 'duel-flag is-blocked', text: 'Заблокировано границей' }),
       event.doubled && h('span', { class: 'duel-flag is-doubled', text: 'Удар ×2: был на крючке' }),
+      event.recognized && h('span', { class: 'duel-flag is-recognized', text: 'Приём узнан: действует слабее' }),
     ]),
     big && h('p', { class: 'duel-card-science', text: card.science }),
   ]);
@@ -182,20 +246,59 @@ function cardView(event, { big = true } = {}) {
 
 /* ---------- view: screens ---------- */
 
+function mixControls(side) {
+  const id = state[side];
+  const { mix, share } = state[mixKey(side)];
+  const locked = state.run && !state.run.done;
+  const lock = locked ? { disabled: '' } : {};
+  const options = [
+    { value: '', label: 'Без примеси' },
+    { value: 'random', label: 'Случайная примесь' },
+    ...ARCHETYPE_IDS.filter((x) => x !== id).map((x) => ({ value: x, label: `+ ${ARCHETYPES[x].name}` })),
+  ];
+  const select = h('select', {
+    class: 'duel-mix-select',
+    attrs: { 'aria-label': 'Примесь второго типа', ...lock },
+    on: { change: (e) => setMix(side, { mix: e.target.value }) },
+  }, options.map((o) => h('option', { attrs: { value: o.value, ...(o.value === mix ? { selected: '' } : {}) }, text: o.label })));
+  const shares = mix && mix !== 'random' && h('div', { class: 'duel-mix-shares' }, SHARES.map((s) => h('button', {
+    class: `chip ${s === share ? 'is-active' : ''}`,
+    attrs: lock,
+    text: pctText(s),
+    on: { click: () => setMix(side, { share: s }) },
+  })));
+  const preview = mix && mix !== 'random' && mix !== id ? makeProfile(id, { mix, share }) : makeProfile(id);
+  return h('div', { class: 'duel-mix' }, [
+    select,
+    shares,
+    preview.borrowed.length > 0 && h('p', { class: 'muted small', text: `Берёт из примеси карту «${CARDS[preview.borrowed[0]].name}»` }),
+    mix === 'random' && h('p', { class: 'muted small', text: 'Второй тип и доля 20–30% выпадут при старте' }),
+    axesView(preview.axes, ARCHETYPES[id].color),
+  ]);
+}
+
 function picker() {
   const locked = state.run && !state.run.done;
   const slot = (side) => {
     const id = state[side];
-    return h('button', {
-      class: `duel-slot ${id ? 'is-filled' : ''}`,
-      attrs: locked ? { disabled: '' } : {},
-      on: { click: () => (id ? clearSlot(side) : null) },
-    }, id
-      ? [media(id, 'media-duel-lg'), h('strong', { text: nameOf(id) }), h('span', { class: 'muted', text: ARCHETYPES[id].name })]
-      : [h('span', { class: 'duel-slot-empty', text: side === 'a' ? 'Игрок A' : 'Игрок B' }), h('span', { class: 'muted', text: 'выберите ниже' })]);
+    if (!id) {
+      return h('div', { class: 'duel-slot' }, [
+        h('span', { class: 'duel-slot-empty', text: side === 'a' ? 'Игрок A' : 'Игрок B' }),
+        h('span', { class: 'muted', text: 'выберите ниже' }),
+      ]);
+    }
+    return h('div', { class: 'duel-slot is-filled' }, [
+      h('button', {
+        class: 'duel-slot-face',
+        attrs: { title: 'Убрать', ...(locked ? { disabled: '' } : {}) },
+        on: { click: () => clearSlot(side) },
+      }, [media(id, 'media-duel-lg'), h('strong', { text: nameOf(id) }), h('span', { class: 'muted', text: ARCHETYPES[id].name })]),
+      mixControls(side),
+    ]);
   };
   return h('div', {}, [
     h('div', { class: 'duel-versus' }, [slot('a'), h('span', { class: 'duel-vs', text: 'vs' }), slot('b')]),
+    h('p', { class: 'muted small duel-mix-note', text: 'Чистых типов не бывает: личность — это точка на непрерывных шкалах (Haslam et al., 2012). Добавьте 20–30% второго типа — например, стиль привязанности к характеру — и посмотрите, как изменится игра.' }),
     h('div', { class: 'roster' }, ARCHETYPE_IDS.map((id) => {
       const taken = state.a === id || state.b === id;
       return h('button', {
@@ -211,16 +314,20 @@ function board() {
   const { run } = state;
   const shown = run.events.slice(0, run.shown);
   const last = shown.at(-1) ?? null;
-  const now = last ? last.after : { a: { ...START, shield: false, hooked: false }, b: { ...START, shield: false, hooked: false } };
+  const fresh = { ...START, shield: false, hooked: false };
+  const now = last ? last.after : { a: fresh, b: fresh };
+  const turn = last ? last.turn : 0;
+  const act = !last ? 0 : last.kind === 'crisis' ? ACTS.length - 1 : last.act;
+  const ended = run.done && run.final.turn < MAX_TURNS;
   return h('div', { class: 'duel-board' }, [
     playerPanel('b', now.b, last),
     h('div', { class: 'duel-table' }, [
-      last ? cardView(last) : h('p', { class: 'duel-table-hint', text: `${nameOf(state.a)} начинает…` }),
+      last ? cardView(last) : h('p', { class: 'duel-table-hint', text: `Акт 1: ${ACTS[0].name}. ${nameOf(state.a)} начинает…` }),
     ]),
     playerPanel('a', now.a, last),
     h('div', { class: 'row duel-controls' }, [
       // While playing, show the full length so an early ending stays a surprise.
-      h('span', { class: 'eyebrow', text: run.done && run.events.length < MAX_TURNS ? `Досрочно на ходу ${run.events.length}` : `Ход ${Math.min(run.shown, run.events.length)} из ${MAX_TURNS}` }),
+      h('span', { class: 'eyebrow', text: ended ? `Досрочно на ходу ${run.final.turn}` : `Акт ${act + 1}: ${ACTS[act].name} · ход ${turn} из ${MAX_TURNS}` }),
       !run.done && h('button', { class: 'btn btn-ghost', text: run.playing ? 'Пауза' : 'Продолжить', on: { click: togglePause } }),
       !run.done && h('button', { class: 'btn btn-ghost', text: 'К итогу', on: { click: skip } }),
       !run.done && h('button', {
@@ -229,12 +336,15 @@ function board() {
         on: { click: () => setState({ speed: state.speed > 1 ? 1 : 2 }) },
       }),
     ]),
-    shown.length > 1 && h('ol', { class: 'duel-log' }, shown.slice(0, -1).reverse().map((e) => h('li', {}, [
-      h('span', { class: 'duel-log-who', text: nameOf(state[e.side]) }),
-      h('span', { class: 'duel-log-card', vars: { '--fam': FAMILIES[CARDS[e.cardId].family].color }, text: CARDS[e.cardId].name }),
-      e.blocked && h('span', { class: 'muted', text: '· заблокировано' }),
-      e.doubled && h('span', { class: 'muted', text: '· ×2' }),
-    ]))),
+    shown.length > 1 && h('ol', { class: 'duel-log' }, shown.slice(0, -1).reverse().map((e) => (e.kind === 'crisis'
+      ? h('li', { class: 'duel-log-crisis' }, [h('span', { class: 'duel-log-who', text: 'Кризис' }), h('span', { class: 'muted', text: 'внешний стресс бьёт по обоим' })])
+      : h('li', {}, [
+        h('span', { class: 'duel-log-who', text: nameOf(state[e.side]) }),
+        h('span', { class: 'duel-log-card', vars: { '--fam': FAMILIES[CARDS[e.cardId].family].color }, text: CARDS[e.cardId].name }),
+        e.blocked && h('span', { class: 'muted', text: '· заблокировано' }),
+        e.doubled && h('span', { class: 'muted', text: '· ×2' }),
+        e.recognized && h('span', { class: 'muted', text: '· узнан' }),
+      ])))),
   ]);
 }
 
@@ -245,19 +355,21 @@ function resultView() {
   const sideName = (side) => nameOf(state[side]);
   let headline;
   if (result.outcome === 'broken' && result.who) headline = `${sideName(result.winner)} «съел» ${sideName(result.who)}`;
-  else if (result.outcome === 'left' && result.who) headline = `${sideName(result.who)} уходит`;
-  else if (result.winner === 'both') headline = 'Выиграли оба';
+  else if (result.outcome === 'left' && result.who) {
+    headline = final[result.who].esteem >= 5 ? `${sideName(result.who)} уходит — и сохраняет себя` : `${sideName(result.who)} уходит`;
+  } else if (result.winner === 'both') headline = 'Выиграли оба';
   else if (result.winner === 'a' || result.winner === 'b') headline = `${sideName(result.winner)} сохранил себя лучше`;
   else headline = 'Ничья';
   const key = decisiveEvent(run.events);
+  const line = (side, id) => h('div', {}, [
+    h('strong', { text: nameOf(id) }),
+    h('span', { class: 'muted', text: ` (${profileLabel(run.profiles[side])}) · самооценка ${final[side].esteem}, доверие ${final[side].trust}` }),
+  ]);
   return h('div', { class: `card duel-result tone-${o.tone}` }, [
     h('span', { class: 'eyebrow', text: o.label }),
     h('h2', { text: headline }),
     h('p', { text: o.text }),
-    h('div', { class: 'duel-final' }, [
-      h('div', {}, [h('strong', { text: nameOf(a) }), h('span', { class: 'muted', text: ` · самооценка ${final.a.esteem}, доверие ${final.a.trust}` })]),
-      h('div', {}, [h('strong', { text: nameOf(b) }), h('span', { class: 'muted', text: ` · самооценка ${final.b.esteem}, доверие ${final.b.trust}` })]),
-    ]),
+    h('div', { class: 'duel-final' }, [line('a', a), line('b', b)]),
     key && h('div', { class: 'duel-key' }, [h('h4', { text: 'Решающий ход' }), cardView(key, { big: false })]),
     h('div', { class: 'row' }, [
       h('button', { class: 'btn btn-primary', text: 'Ещё раз', on: { click: start } }),
@@ -269,36 +381,44 @@ function resultView() {
 
 function tournamentView() {
   const { tour } = state;
+  const runButtons = h('div', { class: 'row' }, [
+    h('button', { class: 'btn btn-ghost', text: 'Чистые типы', on: { click: () => runTournament(false) } }),
+    h('button', { class: 'btn btn-ghost', text: 'Со случайными примесями', on: { click: () => runTournament(true) } }),
+  ]);
   if (!tour) {
     return h('div', { class: 'duel-tour-cta' }, [
-      h('p', { class: 'muted', text: `Все ${ARCHETYPE_IDS.length} типов играют друг с другом по 20 дуэлей — кто выигрывает в долгую и кто строит здоровые союзы.` }),
-      h('button', { class: 'btn btn-ghost', text: 'Запустить турнир', on: { click: runTournament } }),
+      h('p', { class: 'muted', text: `Все ${ARCHETYPE_IDS.length} типов играют друг с другом по 20 дуэлей в трёх актах — кто строит отношения, а кто только перетягивает одеяло.` }),
+      runButtons,
     ]);
   }
   const pct = (n, d) => `${Math.round((n / d) * 100)}%`;
-  const healthiest = [...tour.board].sort((x, y) => y.healthy - x.healthy)[0];
+  const best = tour.board[0];
+  const dominant = [...tour.board].sort((x, y) => y.wins - x.wins)[0];
   return h('div', {}, [
-    h('p', { class: 'note', text: `Тёмные типы чаще «выигрывают» дуэль, но здоровый союз чаще всех строит ${ARCHETYPES[healthiest.id].name.toLowerCase()}: победа в манипуляции — не то же самое, что хорошие отношения.` }),
+    h('p', { class: 'note', text: `Лучше всех отношения строит ${ARCHETYPES[best.id].name.toLowerCase()}. Чаще всех доминирует ${ARCHETYPES[dominant.id].name.toLowerCase()}, но по качеству союза он ${tour.board.indexOf(dominant) + 1}-й из ${tour.board.length}: манипуляция выигрывает спринт и проигрывает отношения.` }),
+    h('p', { class: 'muted small', text: state.tourMixed ? 'Режим: у каждого игрока в каждой дуэли случайная примесь 20–30%.' : 'Режим: чистые типы.' }),
     h('div', { class: 'matrix-wrap' }, [h('table', { class: 'duel-leaderboard' }, [
-      h('thead', {}, [h('tr', {}, ['#', 'Тип', 'Побеждает', 'Здоровый союз', 'Союз по расчёту', 'Сохраняет себя'].map((t) => h('th', { text: t })))]),
+      h('thead', {}, [h('tr', {}, ['#', 'Тип', 'Качество союза', 'Здоровый', 'По расчёту', 'Сохраняет себя', 'Доминирует'].map((t) => h('th', { text: t })))]),
       h('tbody', {}, tour.board.map((s, i) => h('tr', {}, [
         h('td', { text: String(i + 1) }),
         h('td', {}, [h('div', { class: 'duel-lb-name' }, [media(s.id, 'media-xs'), h('span', { text: ARCHETYPES[s.id].name })])]),
-        h('td', { text: pct(s.wins, s.games) }),
+        h('td', {}, [h('strong', { text: String(s.union) })]),
         h('td', { text: pct(s.healthy, s.games) }),
         h('td', { text: pct(s.pragmatic, s.games) }),
         h('td', { text: `${s.avgEsteem} / 10` }),
+        h('td', { text: pct(s.wins, s.games) }),
       ]))),
     ])]),
-    h('p', { class: 'muted small', text: '«Побеждает» — к концу дуэли самооценка выше, чем у партнёра. «Союз по расчёту» — оба целы и держатся на выгоде. «Сохраняет себя» — средняя итоговая самооценка. Правила одинаковы для всех; различаются только колоды и характер. Похожие тёмные типы бьют друг друга мягче: они играют по одним правилам.' }),
+    runButtons,
+    h('p', { class: 'muted small', text: '«Качество союза» — средний исход пары от 0 (партнёра «съели») до 100 (здоровый союз). «Сохраняет себя» — средняя итоговая самооценка. «Доминирует» — к концу самооценка выше, чем у партнёра. Повторный приём на том же партнёре действует слабее: его узнают — быстрее всех те, у кого крепкие границы. Похожие тёмные типы бьют друг друга мягче: они играют по одним правилам.' }),
     h('p', { class: 'muted small duel-disclaimer', text: 'Это иллюстрация паттернов из исследований, а не прогноз ваших отношений.' }),
   ]);
 }
 
-function runTournament() {
-  const t = tournament(ARCHETYPE_IDS, { runs: 20 });
+function runTournament(mixed) {
+  const t = tournament(ARCHETYPE_IDS, { runs: 20, mixed, seed: mixed ? Math.floor(Math.random() * 1e6) : 7 });
   track('duel_tournament');
-  setState({ tour: t });
+  setState({ tour: t, tourMixed: mixed });
 }
 
 function matrixView() {
@@ -335,7 +455,7 @@ function render() {
     // During a duel the intro steps aside so the whole table fits on a phone screen.
     (!run || run.done) && h('span', { class: 'eyebrow', text: 'Дуэль тактик' }),
     (!run || run.done) && h('h1', { class: 'display', text: 'Кто кого?' }),
-    (!run || run.done) && h('p', { class: 'lead', text: 'Два типа личности разыгрывают свои привычные тактики — от love bombing до границ. Каждая карта — реальный приём из психологии со ссылкой на исследование. Смотрите, кто кого «съест».' }),
+    (!run || run.done) && h('p', { class: 'lead', text: 'Два человека разыгрывают свои привычные тактики в трёх актах: знакомство, быт, кризис. Каждая карта — реальный приём из психологии со ссылкой на исследование. Манипуляции сильны на старте, но партнёр их узнаёт; в кризисе пару держит только умение чинить.' }),
     !run || run.done ? picker() : null,
     (!run || run.done) && h('div', { class: 'row duel-start' }, [
       h('button', { class: 'btn btn-primary', text: run?.done ? 'Новая дуэль' : 'Начать дуэль', attrs: ready ? {} : { disabled: '' }, on: { click: start } }),

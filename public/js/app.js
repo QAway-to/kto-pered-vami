@@ -1,4 +1,4 @@
-import { ARCHETYPES, ARCHETYPE_IDS, ARCHETYPE_SLUGS, TRAIT_DEFINITIONS, TRAIT_KEYS } from './archetypes.js';
+import { ARCHETYPES, ARCHETYPE_IDS, ARCHETYPE_SLUGS, LAYERS, TRAIT_DEFINITIONS, TRAIT_KEYS } from './archetypes.js';
 import { QUESTIONS, LIKERT, DIMENSIONS, DIM_KEYS, scoreDimensions, rankArchetypes } from './quiz.js';
 import { CASES } from './cases.js';
 import { h, mount, shuffle, store, api, media, chip, sceneChips, introCard, formatSpeech, isAuthError } from './ui.js';
@@ -88,7 +88,7 @@ function go(tab, arg, push = true) {
   if (tab === 'type' && arg && ARCHETYPES[arg]) {
     document.title = `${ARCHETYPES[arg].name} — Кто перед вами?`;
   } else {
-    document.title = '10 психологических архетипов — Кто перед вами?';
+    document.title = '12 психологических архетипов — Кто перед вами?';
   }
 
   if (tg?.BackButton) {
@@ -170,7 +170,7 @@ function renderHome() {
     h('span', { class: 'pill', text: `Профайлинг: ${dialogs.right}/${dialogs.total}` }),
     skill != null && h('span', { class: 'pill pill-accent', text: `Навык: ${skill}/10` }),
   );
-  mount('archetype-grid', ...ARCHETYPE_IDS.map((id) => {
+  const card = (id) => {
     const a = ARCHETYPES[id];
     return h('button', { class: 'arch-card', on: { click: () => go('type', id) }, attrs: { 'aria-label': a.name } }, [
       media(id),
@@ -193,7 +193,11 @@ function renderHome() {
         ]),
       ]),
     ]);
-  }));
+  };
+  mount('archetype-grid', ...Object.values(LAYERS).flatMap((layer) => [
+    h('div', { class: 'arch-layer-head' }, [h('h2', { text: layer.title }), h('p', { class: 'muted', text: layer.desc })]),
+    ...layer.ids.map(card),
+  ]));
 }
 
 /* ---------- archetype detail ---------- */

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { ARCHETYPES, ARCHETYPE_IDS, archetypeImage } from '../public/js/archetypes.js';
+import { ARCHETYPES, ARCHETYPE_IDS, IMAGES_READY, archetypeImage } from '../public/js/archetypes.js';
 import { QUESTIONS, DIM_KEYS, PROTOTYPES, scoreDimensions, rankArchetypes } from '../public/js/quiz.js';
 import { CASES } from '../public/js/cases.js';
 import { validateMessages, isPersonaId, MAX_MESSAGES, MAX_MESSAGE_CHARS } from '../src/validate.js';
@@ -59,9 +59,9 @@ test('each archetype prototype ranks itself first, strictly', () => {
   }
 });
 
-test('every archetype has its portrait file on disk', () => {
+test('every archetype with artwork has its portrait file on disk', () => {
   assert.equal(archetypeImage('no-such-type'), null);
-  for (const id of ARCHETYPE_IDS) {
+  for (const id of ARCHETYPE_IDS.filter((x) => IMAGES_READY.has(x))) {
     const src = archetypeImage(id);
     assert.equal(src, `/img/archetypes/${id}.webp`);
     assert.ok(existsSync(new URL(`../public${src}`, import.meta.url)), `missing ${src}`);

@@ -1,4 +1,5 @@
-// 10 archetypes: scientific name on the card, social-media name as `aka`, peer-reviewed construct and sources inside.
+// 12 archetypes in two layers: character (how a person treats a partner) and attachment (how they bond).
+// Scientific name on the card, social-media name as `aka`, peer-reviewed construct and sources inside.
 // Shared by the browser and the server. Images go to /img/archetypes/<id>.webp (placeholder until generated).
 
 export const TRAIT_DEFINITIONS = Object.freeze({
@@ -145,25 +146,6 @@ export const ARCHETYPES = {
       'Fraley, R. C., Waller, N. G., & Brennan, K. A. (2000). An item response theory analysis of self-report measures of adult attachment. Journal of Personality and Social Psychology, 78(2), 350–365.',
     ],
   },
-  avoidant: {
-    name: 'Избегающий тип',
-    aka: 'Избегающая привязанность',
-    flagsTitle: 'Что может быть трудно',
-    tagline: 'Чем ближе вы, тем дальше он.',
-    color: '#5db8a6',
-    coreTrait: 'Дистанция как защита',
-    traits: { empathy: 4, rationality: 8, autonomy: 9, influence: 3, sensitivity: 6, masking: 4 },
-    construct: 'Избегающий паттерн (ECR)',
-    science: 'Избегающая привязанность — дискомфорт от близости и зависимости, опора только на себя. На сближение такие люди отвечают дистанцией и «выключением» эмоций: им трудно называть свои чувства и проще говорить о делах. Это защита от риска быть отвергнутым, а не равнодушие.',
-    signs: ['Отвечает коротко и не сразу', 'На разговор о чувствах отвечает фактами', 'Исчезает после сближения'],
-    flags: ['«Мне нужно пространство» в самый важный момент', 'Обесценивание близости', 'Гостинг'],
-    howTo: 'Не давите и не гонитесь: давление усиливает дистанцию. Говорите конкретно, без эмоциональной нагрузки, спрашивайте «что тебе нужно?», а не «что ты чувствуешь?». Доверие растёт через предсказуемость.',
-    refs: [
-      'Bartholomew, K., & Horowitz, L. M. (1991). Attachment styles among young adults. Journal of Personality and Social Psychology, 61(2), 226–244.',
-      'Fraley, R. C. et al. (2011). The ECR-RS questionnaire. Psychological Assessment, 23(3), 615–625.',
-      'Mikulincer, M., & Shaver, P. R. (2016). Attachment in Adulthood: Structure, Dynamics, and Change (2nd ed.). Guilford Press.',
-    ],
-  },
   hsp: {
     name: 'Высокочувствительный',
     aka: 'Эмпат, HSP, «чувствительный»',
@@ -180,44 +162,6 @@ export const ARCHETYPES = {
     refs: [
       'Aron, E. N., & Aron, A. (1997). Sensory-processing sensitivity and its relation to introversion and emotionality. Journal of Personality and Social Psychology, 73(2), 345–368.',
       'Greven, C. U. et al. (2019). Sensory Processing Sensitivity in the context of Environmental Sensitivity. Neuroscience & Biobehavioral Reviews, 98, 287–305.',
-    ],
-  },
-  secure: {
-    name: 'Надёжный тип',
-    aka: 'Надёжная привязанность, «green flag»',
-    flagsTitle: 'Где уязвим',
-    tagline: 'Спокоен в близости, честен в конфликте.',
-    color: '#cc785c',
-    coreTrait: 'Устойчивость и прямота',
-    traits: { empathy: 8, rationality: 8, autonomy: 8, influence: 5, sensitivity: 4, masking: 2 },
-    construct: 'Надёжная привязанность + Light Triad',
-    science: 'Надёжная привязанность — низкая тревога и низкое избегание: человеку комфортно и в близости, и в автономии. Её дополняет светлая триада — кантианство (люди — цель, а не средство), гуманизм и вера в людей, связанные с удовлетворённостью жизнью. В соцсетях это «зелёный флаг».',
-    signs: ['Говорит о чувствах и потребностях прямо', 'Спокойно переносит отказ и критику', 'Искренне радуется чужим успехам'],
-    flags: ['Уязвим для манипуляторов', 'Склонен верить в лучшее в людях', 'Может брать на себя роль «спасателя» в команде'],
-    howTo: 'Будьте честны: фальшь он заметит. Отвечайте взаимностью и прямотой. В команде это опора: на него можно опереться в конфликте.',
-    refs: [
-      'Hazan, C., & Shaver, P. (1987). Romantic love conceptualized as an attachment process. Journal of Personality and Social Psychology, 52(3), 511–524.',
-      'Bartholomew, K., & Horowitz, L. M. (1991). Attachment styles among young adults. Journal of Personality and Social Psychology, 61(2), 226–244.',
-      'Kaufman, S. B., Yaden, D. B., Hyde, E., & Tsukayama, E. (2019). The Light vs. Dark Triad of Personality. Frontiers in Psychology, 10, 467.',
-    ],
-  },
-  schizoid: {
-    name: 'Шизоидный тип',
-    aka: 'Одиночка, философ, гик',
-    flagsTitle: 'Что может быть трудно',
-    tagline: 'В его внутреннем мире интереснее, чем в любой компании.',
-    color: '#3d6070',
-    coreTrait: 'Автономия и мир идей',
-    traits: { empathy: 3, rationality: 10, autonomy: 10, influence: 1, sensitivity: 4, masking: 1 },
-    construct: 'Шизоидный спектр (ICD-11)',
-    science: 'Шизоидный паттерн описывает глубокую интроверсию и фиксацию на внутреннем мире и идеях при органической самодостаточности. В отличие от избегающего типа, отстранение здесь вызвано не страхом отвержения, а отсутствием витальной потребности в постоянном социальном одобрении. Такого человека невозможно смутить лестью, чувством вины или статусным давлением.',
-    signs: ['Неделями комфортно чувствует себя в одиночестве', 'Светской беседе предпочитает сложные темы и разбор концепций', 'Равнодушен к трендам, статусу и демонстративному успеху'],
-    flags: ['Трудно переносит эмоциональные манипуляции и драмы', 'Может восприниматься как холодный или высокомерный, хотя просто погружён в мысли', 'Редко инициирует бытовой контакт первым'],
-    howTo: 'Уважайте его личное пространство и автономию. Общайтесь через интеллектуальный интерес и смысл, без светской шелухи и давления. Не требуйте бурных эмоций: его привязанность выражается в готовности делиться своими мыслями.',
-    refs: [
-      'Fairbairn, W. R. D. (1940). Schizoid factors in the personality. Psychoanalytic Studies of the Personality.',
-      'McWilliams, N. (2011). Psychoanalytic Diagnosis: Understanding Personality Structure in the Clinical Process (2nd ed.). Guilford Press.',
-      'World Health Organization (2022). ICD-11: Personality disorder and related traits — Detachment domain.',
     ],
   },
   'control-freak': {
@@ -247,9 +191,103 @@ export const ARCHETYPES = {
       'McWilliams, N. (2011). Psychoanalytic Diagnosis: Obsessive and Compulsive Personalities. Guilford Press.',
     ],
   },
+  secure: {
+    name: 'Надёжный тип',
+    aka: 'Надёжная привязанность, «green flag»',
+    flagsTitle: 'Где уязвим',
+    tagline: 'Спокоен в близости, честен в конфликте.',
+    color: '#cc785c',
+    coreTrait: 'Устойчивость и прямота',
+    traits: { empathy: 8, rationality: 8, autonomy: 8, influence: 5, sensitivity: 4, masking: 2 },
+    construct: 'Надёжная привязанность + Light Triad',
+    science: 'Надёжная привязанность — низкая тревога и низкое избегание: человеку комфортно и в близости, и в автономии. Её дополняет светлая триада — кантианство (люди — цель, а не средство), гуманизм и вера в людей, связанные с удовлетворённостью жизнью. В соцсетях это «зелёный флаг».',
+    signs: ['Говорит о чувствах и потребностях прямо', 'Спокойно переносит отказ и критику', 'Искренне радуется чужим успехам'],
+    flags: ['Уязвим для манипуляторов', 'Склонен верить в лучшее в людях', 'Может брать на себя роль «спасателя» в команде'],
+    howTo: 'Будьте честны: фальшь он заметит. Отвечайте взаимностью и прямотой. В команде это опора: на него можно опереться в конфликте.',
+    refs: [
+      'Hazan, C., & Shaver, P. (1987). Romantic love conceptualized as an attachment process. Journal of Personality and Social Psychology, 52(3), 511–524.',
+      'Bartholomew, K., & Horowitz, L. M. (1991). Attachment styles among young adults. Journal of Personality and Social Psychology, 61(2), 226–244.',
+      'Kaufman, S. B., Yaden, D. B., Hyde, E., & Tsukayama, E. (2019). The Light vs. Dark Triad of Personality. Frontiers in Psychology, 10, 467.',
+    ],
+  },
+  'anxious-preoccupied': {
+    name: 'Тревожный тип',
+    aka: 'Тревожная привязанность, «тревожник»',
+    flagsTitle: 'Что может быть трудно',
+    tagline: 'Чем дольше вы молчите, тем громче его тревога.',
+    color: '#c98a3a',
+    coreTrait: 'Страх быть оставленным',
+    traits: { empathy: 8, rationality: 4, autonomy: 2, influence: 4, sensitivity: 9, masking: 3 },
+    construct: 'Тревожная привязанность (ECR)',
+    science: 'Высокая тревога и низкое избегание по шкале ECR — «озабоченный» стиль в модели Бартоломью. Близость нужна такому человеку как воздух, но он не уверен, что её заслуживает. Поэтому включаются стратегии гиперактивации: проверки, просьбы о подтверждениях, протест при малейшей дистанции. Пара «тревожный + избегающий» встречается часто и держится годами, хотя удовлетворённость в ней низкая — это и есть «ловушка» из соцсетей. Стиль привязанности не приговор: он меняется в надёжных отношениях.',
+    signs: ['Перечитывает переписку и ищет скрытый смысл', 'Часто спрашивает «ты меня любишь?», «всё нормально?»', 'Сильно тревожится, если ответ задерживается'],
+    flags: ['Протестное поведение: обиды, ревность, проверки телефона', 'Растворяется в партнёре и забывает о себе', 'Тянется к избегающим — и попадает в «догонялки»'],
+    howTo: 'Предсказуемость снимает тревогу: говорите, когда ответите, и выполняйте. Успокаивайте словами и делами, но не поощряйте проверки. Поддерживайте его опору на себя: друзья, дела, своя жизнь.',
+    refs: [
+      'Bartholomew, K., & Horowitz, L. M. (1991). Attachment styles among young adults. Journal of Personality and Social Psychology, 61(2), 226–244.',
+      'Kirkpatrick, L. A., & Davis, K. E. (1994). Attachment style, gender, and relationship stability: A longitudinal analysis. Journal of Personality and Social Psychology, 66(3), 502–512.',
+      'Shaver, P. R., Schachner, D. A., & Nalbone, D. P. (2005). Attachment style, excessive reassurance seeking, relationship processes, and depression. Personality and Social Psychology Bulletin, 31(3), 343–359.',
+    ],
+  },
+  avoidant: {
+    name: 'Избегающий тип',
+    aka: 'Избегающая привязанность',
+    flagsTitle: 'Что может быть трудно',
+    tagline: 'Чем ближе вы, тем дальше он.',
+    color: '#5db8a6',
+    coreTrait: 'Дистанция как защита',
+    traits: { empathy: 4, rationality: 8, autonomy: 9, influence: 3, sensitivity: 6, masking: 4 },
+    construct: 'Избегающий паттерн (ECR)',
+    science: 'Избегающая привязанность — дискомфорт от близости и зависимости, опора только на себя. На сближение такие люди отвечают дистанцией и «выключением» эмоций: им трудно называть свои чувства и проще говорить о делах. Это защита от риска быть отвергнутым, а не равнодушие. Крайняя точка этого спектра — шизоидная отстранённость (домен Detachment в ICD-11): близость не пугает, а просто почти не нужна.',
+    signs: ['Отвечает коротко и не сразу', 'На разговор о чувствах отвечает фактами', 'Исчезает после сближения'],
+    flags: ['«Мне нужно пространство» в самый важный момент', 'Обесценивание близости', 'Гостинг'],
+    howTo: 'Не давите и не гонитесь: давление усиливает дистанцию. Говорите конкретно, без эмоциональной нагрузки, спрашивайте «что тебе нужно?», а не «что ты чувствуешь?». Доверие растёт через предсказуемость.',
+    refs: [
+      'Bartholomew, K., & Horowitz, L. M. (1991). Attachment styles among young adults. Journal of Personality and Social Psychology, 61(2), 226–244.',
+      'Fraley, R. C. et al. (2011). The ECR-RS questionnaire. Psychological Assessment, 23(3), 615–625.',
+      'World Health Organization (2022). ICD-11: Personality disorder and related traits — Detachment domain.',
+      'Mikulincer, M., & Shaver, P. R. (2016). Attachment in Adulthood: Structure, Dynamics, and Change (2nd ed.). Guilford Press.',
+    ],
+  },
+  'fearful-avoidant': {
+    name: 'Дезорганизованный тип',
+    aka: 'Тревожно-избегающая привязанность, fearful-avoidant',
+    flagsTitle: 'Что может быть трудно',
+    tagline: 'Иди ко мне. Нет, стой. Нет, иди.',
+    color: '#8a5a72',
+    coreTrait: 'Хочет близости и боится её',
+    traits: { empathy: 7, rationality: 4, autonomy: 5, influence: 3, sensitivity: 9, masking: 6 },
+    construct: 'Боязливая привязанность (Bartholomew)',
+    science: 'Высокая тревога и высокое избегание одновременно — «боязливый» стиль в четырёхкатегорийной модели Бартоломью: негативный образ и себя, и других. Человек тянется к близости и тут же защищается от неё, потому что ждёт боли. В соцсетях его называют «дезорганизованной привязанностью» — по аналогии с детским дезорганизованным типом, описанным Мэйн и Соломон. Привязанность — это измерения, а не ящики: у взрослых она распределена непрерывно, и стиль может смягчаться.',
+    signs: ['Тёплый и открытый — и вдруг закрывается без видимой причины', 'Сам зовёт ближе и сам же отталкивает', 'Не верит, что его можно любить, и не верит, что ему не причинят боль'],
+    flags: ['Качели «приближение — бегство»', 'Обрывает связь первым, «пока не бросили его»', 'Резкие разрывы и возвраты'],
+    howTo: 'Не отвечайте на отталкивание обидой и не гонитесь: оставайтесь ровным и доступным. Маленькие шаги и предсказуемость важнее громких признаний. Если качели изматывают вас — это повод для границ, а не для спасательства.',
+    refs: [
+      'Bartholomew, K., & Horowitz, L. M. (1991). Attachment styles among young adults. Journal of Personality and Social Psychology, 61(2), 226–244.',
+      'Main, M., & Solomon, J. (1990). Procedures for identifying infants as disorganized/disoriented during the Ainsworth Strange Situation. In Attachment in the Preschool Years. University of Chicago Press.',
+      'Fraley, R. C., Hudson, N. W., Heffernan, M. E., & Segal, N. (2015). Are adult attachment styles categorical or dimensional? Journal of Personality and Social Psychology, 109(2), 354–368.',
+    ],
+  },
 };
 
 export const ARCHETYPE_IDS = Object.freeze(Object.keys(ARCHETYPES));
+
+/**
+ * Two layers, not one list: everyone has an attachment style on top of their character, and the two mix
+ * (Bartholomew & Horowitz, 1991; types are prototypes on continuous dimensions, Haslam et al., 2012).
+ */
+export const LAYERS = Object.freeze({
+  character: {
+    title: 'Характер',
+    desc: 'Как человек обращается с партнёром: от манипуляций до чуткости.',
+    ids: ['dark-empath', 'grandiose-narcissist', 'vulnerable-narcissist', 'machiavellian', 'psychopath', 'borderline', 'hsp', 'control-freak'],
+  },
+  attachment: {
+    title: 'Привязанность',
+    desc: 'Как человек сближается. Стиль привязанности есть у каждого и смешивается с характером.',
+    ids: ['secure', 'anxious-preoccupied', 'avoidant', 'fearful-avoidant'],
+  },
+});
 
 export const ARCHETYPE_SLUGS = Object.freeze({
   'dark-empath': 'dark-empath',
@@ -271,17 +309,23 @@ export const ARCHETYPE_SLUGS = Object.freeze({
   'avoid': 'avoidant',
   'borderline': 'borderline',
   'bpd': 'borderline',
-  'schizoid': 'schizoid',
-  'shizo': 'schizoid',
-  'shizoid': 'schizoid',
+  'fearful-avoidant': 'fearful-avoidant',
+  'fearful': 'fearful-avoidant',
+  'disorganized': 'fearful-avoidant',
+  // The schizoid card folded into the avoidant spectrum; old links keep working.
+  'schizoid': 'avoidant',
+  'shizo': 'avoidant',
+  'shizoid': 'avoidant',
   'secure': 'secure',
   'control-freak': 'control-freak',
   'controller': 'control-freak',
   'control': 'control-freak',
   'anankastic': 'control-freak',
   // Cyrillic aliases
-  'шизоид': 'schizoid',
-  'шизо': 'schizoid',
+  'шизоид': 'avoidant',
+  'шизо': 'avoidant',
+  'тревожный': 'anxious-preoccupied',
+  'дезорганизованный': 'fearful-avoidant',
   'нарцисс': 'grandiose-narcissist',
   'эмпат': 'dark-empath',
   'макиавелли': 'machiavellian',
@@ -294,7 +338,8 @@ export const ARCHETYPE_SLUGS = Object.freeze({
 });
 
 // Add an id here once /img/archetypes/<id>.webp exists; until then the card shows a monogram placeholder.
-export const IMAGES_READY = new Set(ARCHETYPE_IDS);
+const IMAGES_PENDING = new Set(['anxious-preoccupied', 'fearful-avoidant']);
+export const IMAGES_READY = new Set(ARCHETYPE_IDS.filter((id) => !IMAGES_PENDING.has(id)));
 
 /** @param {string} id */
 export const archetypeImage = (id) => (IMAGES_READY.has(id) ? `/img/archetypes/${id}.webp` : null);

@@ -33,16 +33,17 @@ test('GET /healthz and static index', async () => {
 
 test('GET archetype direct pages and aliases with open graph metadata', async () => {
   const app = createApp({ llm: null });
+  // The schizoid card folded into the avoidant spectrum: old links land there.
   const resShizo = await request(app).get('/shizo').expect(200);
-  assert.match(resShizo.text, /Шизоидный тип/);
+  assert.match(resShizo.text, /Избегающий тип/);
   assert.match(resShizo.text, /og:image/);
-  assert.match(resShizo.text, /\/img\/archetypes\/schizoid\.webp/);
+  assert.match(resShizo.text, /\/img\/archetypes\/avoidant\.webp/);
 
-  const resSchizoid = await request(app).get('/schizoid').expect(200);
-  assert.match(resSchizoid.text, /Шизоидный тип/);
+  const resAnxious = await request(app).get('/anxious').expect(200);
+  assert.match(resAnxious.text, /Тревожный тип/);
 
-  const resType = await request(app).get('/type/schizoid').expect(200);
-  assert.match(resType.text, /Шизоидный тип/);
+  const resType = await request(app).get('/type/fearful-avoidant').expect(200);
+  assert.match(resType.text, /Дезорганизованный тип/);
 
   const resDark = await request(app).get('/dark-empath').expect(200);
   assert.match(resDark.text, /Тёмный эмпат/);

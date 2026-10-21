@@ -3,7 +3,7 @@
 // Shared by the browser and the tests.
 
 export const START = Object.freeze({ esteem: 7, trust: 6 });
-export const MAX_TURNS = 10; // plays in total, alternating A, B
+export const MAX_TURNS = 18; // plays in total, alternating A, B: three acts of six
 export const HAND_SIZE = 3;
 
 /** Card families: colour on the card and how statuses react to it. */
@@ -101,11 +101,6 @@ export const CARDS = {
     self: {}, target: { trust: -1 },
     science: 'Подавление эмоций и уход в факты (Fraley et al., 2011)',
   },
-  detach: {
-    name: 'Безразличие', family: 'withdrawal', line: '«Мне, в общем, всё равно».',
-    self: { esteem: 1 }, target: { esteem: -1, trust: -2 }, hurts: true,
-    science: 'Отстранённость в шизоидном спектре (ICD-11)',
-  },
   attune: {
     name: 'Почувствовать', family: 'healthy', line: '«Я вижу, что тебе сейчас тяжело».',
     self: { esteem: -1 }, target: { esteem: 1, trust: 1 },
@@ -135,6 +130,16 @@ export const CARDS = {
     name: 'Сделать всё самому', family: 'control', line: '«Не трогай, я сам».',
     self: { esteem: -1 }, target: { trust: -1 },
     science: 'Гиперответственность и недоверие к другим (Hewitt & Flett, 1991)',
+  },
+  seek_reassurance: {
+    name: 'Требовать подтверждений', family: 'anxious', line: '«Ты меня точно любишь? Скажи ещё раз».',
+    self: { esteem: 1 }, target: { trust: -1 },
+    science: 'Избыточный поиск подтверждений при тревожной привязанности (Shaver et al., 2005)',
+  },
+  push_pull: {
+    name: 'Притянуть и оттолкнуть', family: 'anxious', line: '«Иди ко мне… Нет, оставь меня в покое».',
+    self: { esteem: -1 }, target: { esteem: -1, trust: -1 }, hook: true, hurts: true,
+    science: 'Боязливая привязанность: хочу близости и боюсь её (Bartholomew & Horowitz, 1991)',
   },
   generosity: {
     name: 'Щедрость и восхищение', family: 'healthy', line: '«Ты сегодня потрясающе выглядишь. Пойдём, я угощаю».',
@@ -193,32 +198,58 @@ export const DECKS = {
   machiavellian: ['charm', 'triangulation', 'gaslighting', 'guilt_trip', 'deal'],
   psychopath: ['charm', 'provocation', 'gaslighting', 'devaluation', 'adventure'],
   borderline: ['idealization', 'test', 'cling', 'outburst', 'repair'],
-  avoidant: ['withdraw', 'deflect', 'ghosting', 'boundary', 'empathy'],
   hsp: ['attune', 'retreat', 'empathy', 'i_message', 'withdraw'],
-  secure: ['i_message', 'boundary', 'repair', 'empathy', 'pause'],
-  schizoid: ['detach', 'deflect', 'withdraw', 'retreat', 'boundary'],
   'control-freak': ['take_control', 'nitpick', 'set_rule', 'do_it_myself', 'i_message'],
+  secure: ['i_message', 'boundary', 'repair', 'empathy', 'pause'],
+  'anxious-preoccupied': ['seek_reassurance', 'cling', 'test', 'open_up', 'empathy'],
+  avoidant: ['withdraw', 'deflect', 'ghosting', 'boundary', 'empathy'],
+  'fearful-avoidant': ['push_pull', 'open_up', 'withdraw', 'test', 'ghosting'],
 };
 
 /**
- * How each archetype weighs a situation when it picks a card, plus two traits of the person:
- * `bond` — how much trust they actually form (cold types barely attach: gains are scaled down);
- * `resilience` — how hard esteem hits land (secure attachment buffers, high sensitivity amplifies);
- * `keep` — how much a dark type invests in keeping a partner it values (pragmatic or playful love, not none).
+ * Six research axes, 0..10. They describe the person; the engine derives how they play from them,
+ * so a mix of two types is simply a weighted mix of their axes.
  */
-export const STYLE = {
-  'dark-empath': { exploit: 2, selfCare: 1, repair: 0, bond: 0.6, resilience: 1, keep: 1.5 },
-  'grandiose-narcissist': { exploit: 3, selfCare: 1, repair: 0, bond: 0.6, resilience: 1.2, keep: 1.5 },
-  'vulnerable-narcissist': { exploit: 1, selfCare: 2, repair: 0, bond: 0.8, resilience: 1.3, keep: 1.5 },
-  machiavellian: { exploit: 3, selfCare: 1, repair: 0, bond: 0.4, resilience: 0.8, keep: 2 },
-  psychopath: { exploit: 3, selfCare: 0, repair: 0, bond: 0.2, resilience: 0.6, keep: 0.7 },
-  borderline: { exploit: 0, selfCare: 1, repair: 1, bond: 1.2, resilience: 1.3 },
-  avoidant: { exploit: 0, selfCare: 2, repair: 1, bond: 0.6, resilience: 0.9 },
-  hsp: { exploit: 0, selfCare: 2, repair: 2, bond: 1, resilience: 1.3 },
-  secure: { exploit: 0, selfCare: 2, repair: 3, bond: 1, resilience: 0.6 },
-  schizoid: { exploit: 0, selfCare: 2, repair: 0, bond: 0.3, resilience: 0.8 },
-  'control-freak': { exploit: 1, selfCare: 1, repair: 1, bond: 0.8, resilience: 1 },
+export const AXES = {
+  honesty: { label: 'Честность', source: 'HEXACO: честность–скромность, обратна «тёмному ядру» (Moshagen et al., 2018)' },
+  anxiety: { label: 'Тревога привязанности', source: 'ECR: страх быть оставленным (Brennan, Clark & Shaver, 1998)' },
+  avoidance: { label: 'Избегание близости', source: 'ECR: дискомфорт от близости и зависимости' },
+  stability: { label: 'Устойчивость', source: 'Big Five: эмоциональная стабильность (низкий нейротизм)' },
+  warmth: { label: 'Теплота', source: 'Big Five / HEXACO: доброжелательность и эмпатия' },
+  boundaries: { label: 'Границы', source: 'Самоуважение (Rosenberg, 1965) и умение защищать себя' },
 };
+
+export const AXIS_KEYS = Object.freeze(Object.keys(AXES));
+
+/** Prototype of each archetype on the six axes (our reading of the literature, not norms). */
+export const PROFILES = {
+  'dark-empath': { honesty: 2, anxiety: 4, avoidance: 4, stability: 5, warmth: 6, boundaries: 6 },
+  'grandiose-narcissist': { honesty: 1, anxiety: 2, avoidance: 6, stability: 6, warmth: 2, boundaries: 7 },
+  'vulnerable-narcissist': { honesty: 3, anxiety: 8, avoidance: 6, stability: 2, warmth: 3, boundaries: 4 },
+  machiavellian: { honesty: 1, anxiety: 3, avoidance: 7, stability: 7, warmth: 2, boundaries: 7 },
+  psychopath: { honesty: 0, anxiety: 1, avoidance: 9, stability: 9, warmth: 0, boundaries: 5 },
+  borderline: { honesty: 6, anxiety: 10, avoidance: 3, stability: 1, warmth: 7, boundaries: 2 },
+  hsp: { honesty: 8, anxiety: 5, avoidance: 4, stability: 3, warmth: 9, boundaries: 5 },
+  'control-freak': { honesty: 6, anxiety: 6, avoidance: 5, stability: 4, warmth: 3, boundaries: 7 },
+  secure: { honesty: 9, anxiety: 1, avoidance: 1, stability: 8, warmth: 8, boundaries: 9 },
+  'anxious-preoccupied': { honesty: 7, anxiety: 9, avoidance: 1, stability: 3, warmth: 8, boundaries: 3 },
+  avoidant: { honesty: 6, anxiety: 2, avoidance: 9, stability: 6, warmth: 4, boundaries: 7 },
+  'fearful-avoidant': { honesty: 6, anxiety: 8, avoidance: 8, stability: 2, warmth: 5, boundaries: 3 },
+};
+
+/** Nobody is a pure type: a mix takes 20–30% of a second one (dimensional view, Haslam et al., 2012). */
+export const MIX = Object.freeze({ min: 0.2, max: 0.3, default: 0.25 });
+
+/**
+ * A duel runs in three acts. Early on manipulation works best (admiration charms at first, Wurst et al., 2017);
+ * in the crisis act outside stress hits both partners, and only those who repair keep the bond.
+ */
+export const ACTS = Object.freeze([
+  { name: 'Знакомство', from: 0 },
+  { name: 'Быт', from: 6 },
+  { name: 'Кризис', from: 12 },
+]);
+export const CRISIS = Object.freeze({ trust: -1, esteem: -1 });
 
 /**
  * Partners of a kind play by shared rules: their manipulations land softer on each other.
@@ -228,13 +259,13 @@ export const STYLE = {
 export const DARK = Object.freeze(['dark-empath', 'grandiose-narcissist', 'vulnerable-narcissist', 'machiavellian', 'psychopath']);
 export const NARCISSISTS = Object.freeze(['grandiose-narcissist', 'vulnerable-narcissist']);
 
-/** Endings, judged from the final meters. */
+/** Endings, judged from the final meters. `union` scores the couple for the «Качество союза» table. */
 export const OUTCOMES = {
-  broken: { label: 'Сломлен', tone: 'bad', text: 'Самооценка одного обнулилась: его «съели».' },
-  left: { label: 'Ушёл', tone: 'bad', text: 'Доверие одного обнулилось, и он ушёл из отношений.' },
-  toxic: { label: 'Токсичная петля', tone: 'bad', text: 'Держатся друг за друга, но разрушают себя.' },
-  cold: { label: 'Холодная война', tone: 'mid', text: 'Вместе, но доверия почти не осталось.' },
-  healthy: { label: 'Здоровый союз', tone: 'good', text: 'Оба сохранили себя и доверие друг к другу.' },
-  pragmatic: { label: 'Союз по расчёту', tone: 'mid', text: 'Оба целы и держатся вместе на взаимной выгоде — без тепла, но устойчиво.' },
-  shaky: { label: 'Шатко', tone: 'mid', text: 'Ни победы, ни разрыва: отношения на грани.' },
+  broken: { label: 'Сломлен', tone: 'bad', union: -2, text: 'Самооценка одного обнулилась: его «съели».' },
+  left: { label: 'Ушёл', tone: 'bad', union: -1, text: 'Доверие одного обнулилось, и он ушёл из отношений.' },
+  toxic: { label: 'Токсичная петля', tone: 'bad', union: -1, text: 'Держатся друг за друга, но разрушают себя.' },
+  cold: { label: 'Холодная война', tone: 'mid', union: 0, text: 'Вместе, но доверия почти не осталось.' },
+  shaky: { label: 'Шатко', tone: 'mid', union: 1, text: 'Ни победы, ни разрыва: отношения на грани.' },
+  pragmatic: { label: 'Союз по расчёту', tone: 'mid', union: 2, text: 'Оба целы и держатся вместе на взаимной выгоде — без тепла, но устойчиво.' },
+  healthy: { label: 'Здоровый союз', tone: 'good', union: 3, text: 'Оба сохранили себя и доверие друг к другу.' },
 };
