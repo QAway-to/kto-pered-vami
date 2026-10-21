@@ -68,6 +68,24 @@ export function randomProfile(core, rng) {
   return makeProfile(core, { mix, share });
 }
 
+/**
+ * The player's own profile from the quiz ranking: the closest type is the core, the closest type of the other layer
+ * (attachment for a character, character for an attachment style) is the admixture. The closer it ranks to the core,
+ * the bigger its share, within 20–30%.
+ * @param {{id: string, match: number}[]} ranked - rankArchetypes output, best first
+ * @param {Record<string, string>} layerOf - archetype id → layer name
+ * @returns {object|null}
+ */
+export function profileFromQuiz(ranked, layerOf) {
+  const [top] = ranked ?? [];
+  if (!top || !PROFILES[top.id]) return null;
+  const second = ranked.find((r) => PROFILES[r.id] && layerOf[r.id] && layerOf[r.id] !== layerOf[top.id]);
+  if (!second) return makeProfile(top.id);
+  const closeness = top.match > 0 ? Math.min(1, second.match / top.match) : 0;
+  const share = Math.round((MIX.min + (MIX.max - MIX.min) * closeness) * 20) / 20;
+  return makeProfile(top.id, { mix: second.id, share });
+}
+
 const asProfile = (p) => (typeof p === 'string' ? makeProfile(p) : p);
 
 /**

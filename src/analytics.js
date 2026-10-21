@@ -14,6 +14,7 @@ export const EVENTS = Object.freeze([
   'duel_started',
   'duel_completed',
   'duel_tournament',
+  'duel_myself',
   'login_completed',
   'paywall_shown',
   'subscription_confirmed',

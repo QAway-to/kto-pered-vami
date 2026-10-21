@@ -995,3 +995,6 @@ p, li, .lead, .msg, .arch-tagline, .slot-motive, .note, .feedback {
 .duel-flag.is-recognized { background: #5a6b7a; }
 .duel-card.is-crisis { border-style: dashed; }
 .duel-log-crisis .duel-log-who { color: #8a6d3b; }
+
+.duel-me { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
+.duel-me p { margin: 0; flex: 1 1 220px; }

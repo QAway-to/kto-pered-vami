@@ -1,10 +1,10 @@
 // «Дуэль тактик» UI: pick two people (a type plus an optional admixture), watch three acts of tactic cards,
 // see how the relationship ends; run the full tournament.
 
-import { ARCHETYPES, ARCHETYPE_IDS } from './archetypes.js';
+import { ARCHETYPES, ARCHETYPE_IDS, LAYERS } from './archetypes.js';
 import { PERSONA_NAMES } from './lab-data.js';
 import { CARDS, FAMILIES, OUTCOMES, MAX_TURNS, START, ACTS, AXES, AXIS_KEYS, MIX } from './duel-data.js';
-import { runDuel, decisiveEvent, tournament, makeProfile } from './duel-engine.js';
+import { runDuel, decisiveEvent, tournament, makeProfile, profileFromQuiz } from './duel-engine.js';
 import { h, mount, store, media } from './ui.js';
 import { track } from './track.js';
 
@@ -18,12 +18,25 @@ const pctText = (share) => `${Math.round(share * 100)}%`;
 /**
  * `mixA` / `mixB`: the admixture chosen for each slot — '' (none), 'random' or an archetype id — and its share.
  * @type {{a: string|null, b: string|null, mixA: {mix: string, share: number}, mixB: {mix: string, share: number},
- *         run: any, tour: any, tourMixed: boolean, speed: number}}
+ *         me: 'a'|'b'|null, run: any, tour: any, tourMixed: boolean, speed: number}}
+ * `me` — the slot the user plays themself, with the profile from their quiz result.
  */
 let state = {
   a: null, b: null, mixA: { mix: '', share: MIX.default }, mixB: { mix: '', share: MIX.default },
-  run: null, tour: null, tourMixed: false, speed: 1,
+  me: null, run: null, tour: null, tourMixed: false, speed: 1,
 };
+
+/** Display name of a side: «Вы» for the user's own slot, the persona's first name otherwise. */
+const sideName = (side) => (state.me === side ? 'Вы' : nameOf(state[side]));
+
+const LAYER_OF = Object.fromEntries(Object.entries(LAYERS).flatMap(([layer, l]) => l.ids.map((id) => [id, layer])));
+
+/** The user's profile from the saved quiz result, or null before the test. */
+function myProfile() {
+  const r = store.get('result', null);
+  if (!Array.isArray(r?.ranked) || !r.ranked.every((x) => isArchetype(x?.id))) return null;
+  return profileFromQuiz(r.ranked, LAYER_OF);
+}
 let timer = null;
 let scrollToTable = false; // only when a duel starts, never on every step
 
@@ -124,18 +137,30 @@ function pick(id) {
   if (state.run && !state.run.done) return;
   if (state.a === id || state.b === id) return;
   // A new core starts without an admixture: the old one may even be the new core itself.
-  if (!state.a) setState({ a: id, mixA: NO_MIX, run: null });
-  else setState({ b: id, mixB: NO_MIX, run: null });
+  if (!state.a) setState({ a: id, mixA: NO_MIX, me: state.me === 'a' ? null : state.me, run: null });
+  else setState({ b: id, mixB: NO_MIX, me: state.me === 'b' ? null : state.me, run: null });
 }
 
 function clearSlot(slot) {
   if (state.run && !state.run.done) return;
-  setState({ [slot]: null, [mixKey(slot)]: NO_MIX, run: null });
+  setState({ [slot]: null, [mixKey(slot)]: NO_MIX, me: state.me === slot ? null : state.me, run: null });
 }
 
 function swap() {
   if (state.run && !state.run.done) return;
-  setState({ a: state.b, b: state.a, mixA: state.mixB, mixB: state.mixA, run: null });
+  setState({ a: state.b, b: state.a, mixA: state.mixB, mixB: state.mixA, me: state.me && (state.me === 'a' ? 'b' : 'a'), run: null });
+}
+
+/** Puts the user into the first free slot (or A), with their quiz core and admixture. */
+function playMyself() {
+  if (state.run && !state.run.done) return;
+  const p = myProfile();
+  if (!p) return;
+  const side = state.me ?? (!state.a ? 'a' : !state.b ? 'b' : 'a');
+  const otherSide = side === 'a' ? 'b' : 'a';
+  const clash = state[otherSide] === p.id ? { [otherSide]: null, [mixKey(otherSide)]: NO_MIX } : {};
+  track('duel_myself', { archetype: p.id });
+  setState({ ...clash, [side]: p.id, [mixKey(side)]: p.mix ? { mix: p.mix, share: p.share } : NO_MIX, me: side, run: null });
 }
 
 function setMix(side, patch) {
@@ -185,7 +210,7 @@ function playerPanel(side, p, lastEvent) {
     media(id, 'media-duel'),
     h('div', { class: 'duel-player-body' }, [
       h('div', { class: 'duel-player-head' }, [
-        h('strong', { text: nameOf(id) }),
+        h('strong', { text: sideName(side) }),
         h('span', { class: 'muted', text: profileLabel(state.run.profiles[side]) }),
       ]),
       meter('Самооценка', p.esteem, 'is-esteem'),
@@ -228,11 +253,10 @@ function cardView(event, { big = true } = {}) {
   if (event.kind === 'crisis') return crisisView(event);
   const card = CARDS[event.cardId];
   const fam = FAMILIES[card.family];
-  const actor = state[event.side];
   return h('div', { class: `duel-card ${big ? 'is-big' : ''} from-${event.side}`, vars: { '--fam': fam.color }, attrs: { 'data-turn': String(event.turn) } }, [
     h('div', { class: 'duel-card-top' }, [
       h('span', { class: 'duel-card-family', text: fam.label }),
-      h('span', { class: 'duel-card-by', text: nameOf(actor) }),
+      h('span', { class: 'duel-card-by', text: sideName(event.side) }),
     ]),
     h('h3', { class: 'duel-card-name', text: card.name }),
     h('p', { class: 'duel-card-line', text: card.line }),
@@ -279,6 +303,25 @@ function mixControls(side) {
   ]);
 }
 
+function myCta(locked) {
+  const p = myProfile();
+  if (!p) {
+    return h('div', { class: 'duel-me' }, [
+      h('p', { class: 'muted small', text: 'Пройдите тест — и сыграйте собой: ваш тип станет ядром, а ближайший тип другого слоя — примесью.' }),
+      h('button', { class: 'btn btn-ghost', text: 'Пройти тест', on: { click: () => document.querySelector('[data-go="test"]')?.click() } }),
+    ]);
+  }
+  return h('div', { class: 'duel-me' }, [
+    h('button', {
+      class: 'btn btn-primary',
+      text: state.me ? 'Вы в игре' : 'Сыграть собой',
+      attrs: locked || state.me ? { disabled: '' } : {},
+      on: { click: playMyself },
+    }),
+    h('span', { class: 'muted small', text: `По тесту: ${profileLabel(p)}` }),
+  ]);
+}
+
 function picker() {
   const locked = state.run && !state.run.done;
   const slot = (side) => {
@@ -294,12 +337,13 @@ function picker() {
         class: 'duel-slot-face',
         attrs: { title: 'Убрать', ...(locked ? { disabled: '' } : {}) },
         on: { click: () => clearSlot(side) },
-      }, [media(id, 'media-duel-lg'), h('strong', { text: nameOf(id) }), h('span', { class: 'muted', text: ARCHETYPES[id].name })]),
+      }, [media(id, 'media-duel-lg'), h('strong', { text: sideName(side) }), h('span', { class: 'muted', text: state.me === side ? `Ваш профиль: ${ARCHETYPES[id].name}` : ARCHETYPES[id].name })]),
       mixControls(side),
     ]);
   };
   return h('div', {}, [
     h('div', { class: 'duel-versus' }, [slot('a'), h('span', { class: 'duel-vs', text: 'vs' }), slot('b')]),
+    myCta(locked),
     h('p', { class: 'muted small duel-mix-note', text: 'Чистых типов не бывает: личность — это точка на непрерывных шкалах (Haslam et al., 2012). Добавьте 20–30% второго типа — например, стиль привязанности к характеру — и посмотрите, как изменится игра.' }),
     h('div', { class: 'roster' }, ARCHETYPE_IDS.map((id) => {
       const taken = state.a === id || state.b === id;
@@ -324,7 +368,7 @@ function board() {
   return h('div', { class: 'duel-board' }, [
     playerPanel('b', now.b, last),
     h('div', { class: 'duel-table' }, [
-      last ? cardView(last) : h('p', { class: 'duel-table-hint', text: `Акт 1: ${ACTS[0].name}. ${nameOf(state.a)} начинает…` }),
+      last ? cardView(last) : h('p', { class: 'duel-table-hint', text: `Акт 1: ${ACTS[0].name}. ${sideName('a')}: первый ход…` }),
     ]),
     playerPanel('a', now.a, last),
     h('div', { class: 'row duel-controls' }, [
@@ -341,7 +385,7 @@ function board() {
     shown.length > 1 && h('ol', { class: 'duel-log' }, shown.slice(0, -1).reverse().map((e) => (e.kind === 'crisis'
       ? h('li', { class: 'duel-log-crisis' }, [h('span', { class: 'duel-log-who', text: 'Кризис' }), h('span', { class: 'muted', text: 'внешний стресс бьёт по обоим' })])
       : h('li', {}, [
-        h('span', { class: 'duel-log-who', text: nameOf(state[e.side]) }),
+        h('span', { class: 'duel-log-who', text: sideName(e.side) }),
         h('span', { class: 'duel-log-card', vars: { '--fam': FAMILIES[CARDS[e.cardId].family].color }, text: CARDS[e.cardId].name }),
         e.blocked && h('span', { class: 'muted', text: '· заблокировано' }),
         e.doubled && h('span', { class: 'muted', text: '· ×2' }),
@@ -351,27 +395,26 @@ function board() {
 }
 
 function resultView() {
-  const { run, a, b } = state;
+  const { run } = state;
   const { result, final } = run;
   const o = OUTCOMES[result.outcome];
-  const sideName = (side) => nameOf(state[side]);
   let headline;
-  if (result.outcome === 'broken' && result.who) headline = `${sideName(result.winner)} «съел» ${sideName(result.who)}`;
+  if (result.outcome === 'broken' && result.who) headline = `${sideName(result.who)}: самооценка на нуле`;
   else if (result.outcome === 'left' && result.who) {
-    headline = final[result.who].esteem >= 5 ? `${sideName(result.who)} уходит — и сохраняет себя` : `${sideName(result.who)} уходит`;
+    headline = final[result.who].esteem >= 5 ? `${sideName(result.who)}: уход из отношений, самооценка цела` : `${sideName(result.who)}: уход из отношений`;
   } else if (result.winner === 'both') headline = 'Выиграли оба';
-  else if (result.winner === 'a' || result.winner === 'b') headline = `${sideName(result.winner)} сохранил себя лучше`;
+  else if (result.winner === 'a' || result.winner === 'b') headline = `${sideName(result.winner)}: самооценка выше к концу`;
   else headline = 'Ничья';
   const key = decisiveEvent(run.events);
-  const line = (side, id) => h('div', {}, [
-    h('strong', { text: nameOf(id) }),
+  const line = (side) => h('div', {}, [
+    h('strong', { text: sideName(side) }),
     h('span', { class: 'muted', text: ` (${profileLabel(run.profiles[side])}) · самооценка ${final[side].esteem}, доверие ${final[side].trust}` }),
   ]);
   return h('div', { class: `card duel-result tone-${o.tone}` }, [
     h('span', { class: 'eyebrow', text: o.label }),
     h('h2', { text: headline }),
     h('p', { text: o.text }),
-    h('div', { class: 'duel-final' }, [line('a', a), line('b', b)]),
+    h('div', { class: 'duel-final' }, [line('a'), line('b')]),
     key && h('div', { class: 'duel-key' }, [h('h4', { text: 'Решающий ход' }), cardView(key, { big: false })]),
     h('div', { class: 'row' }, [
       h('button', { class: 'btn btn-primary', text: 'Ещё раз', on: { click: start } }),
@@ -439,7 +482,7 @@ function matrixView() {
         class: `cell ${cls}`,
         text: r ? OUTCOMES[r.outcome].label.slice(0, 1) : '',
         attrs: { title: `${ARCHETYPES[rowId].name} vs ${ARCHETYPES[colId].name}${r ? `: ${OUTCOMES[r.outcome].label}` : ''}` },
-        on: { click: () => { if (!state.run || state.run.done) setState({ a: rowId, b: colId, mixA: NO_MIX, mixB: NO_MIX, run: null }); } },
+        on: { click: () => { if (!state.run || state.run.done) setState({ a: rowId, b: colId, mixA: NO_MIX, mixB: NO_MIX, me: null, run: null }); } },
       });
     }),
   ]));
@@ -479,7 +522,7 @@ function render() {
 /** @param {string} [presetId] - archetype to put into slot A */
 export function renderDuel(presetId) {
   if (isArchetype(presetId) && (!state.run || state.run.done)) {
-    state = { ...state, a: presetId, mixA: NO_MIX, ...(state.b === presetId ? { b: null, mixB: NO_MIX } : {}), run: null };
+    state = { ...state, a: presetId, mixA: NO_MIX, me: null, ...(state.b === presetId ? { b: null, mixB: NO_MIX } : {}), run: null };
   }
   render();
 }

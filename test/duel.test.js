@@ -6,8 +6,23 @@ import {
 } from '../public/js/duel-data.js';
 import {
   makeRng, initState, drawHand, chooseCard, applyCard, isOver, judge, decisiveEvent, runDuel, tournament, similarity,
-  makeProfile, randomProfile, styleOf, recognition,
+  makeProfile, randomProfile, styleOf, recognition, profileFromQuiz,
 } from '../public/js/duel-engine.js';
+import { rankArchetypes, scoreDimensions, QUESTIONS, PROTOTYPES } from '../public/js/quiz.js';
+
+const LAYER_OF = Object.fromEntries(Object.entries(LAYERS).flatMap(([layer, l]) => l.ids.map((id) => [id, layer])));
+
+test('the quiz result becomes a profile: top type as core, closest type of the other layer as admixture', () => {
+  const ideal = (id) => QUESTIONS.map((q) => (PROTOTYPES[id].high.includes(q.dim) ? 5 : PROTOTYPES[id].low.includes(q.dim) ? 1 : 3));
+  const p = profileFromQuiz(rankArchetypes(scoreDimensions(ideal('machiavellian'))), LAYER_OF);
+  assert.equal(p.id, 'machiavellian');
+  assert.equal(LAYER_OF[p.mix], 'attachment');
+  assert.ok(p.share >= 0.2 && p.share <= 0.3);
+  const q = profileFromQuiz(rankArchetypes(scoreDimensions(ideal('secure'))), LAYER_OF);
+  assert.equal(LAYER_OF[q.mix], 'character');
+  assert.equal(profileFromQuiz([], LAYER_OF), null);
+  assert.equal(profileFromQuiz([{ id: 'secure', match: 90 }], LAYER_OF).mix, null, 'no second layer in the ranking');
+});
 
 const cardsOf = (events) => events.filter((e) => e.kind !== 'crisis');
 
