@@ -16,10 +16,12 @@
 
 ```
 The attached image is the STYLE REFERENCE ONLY. Paint a new portrait in exactly the same style and rendering:
-stylized 2.5D digital painting, Pixar-meets-editorial illustration, soft painterly skin, large expressive eyes,
-warm cinematic side light with a soft glow, smooth softly blurred gradient background, chest-up framing with the face
-in the upper half, slight head tilt, vertical 4:5. Do NOT copy the reference person's face, hair, earrings or clothes:
-draw a completely different person as described below. No text, no logos, no watermark, exactly one person.
+semi-realistic digital character painting, mature adult facial anatomy, realistic human facial proportions,
+soft painterly skin rendering, cinematic warm golden rim light on one side with deep rich colored shadows on the other,
+smooth softly blurred gradient background, natural 3/4 angle chest-up portrait, vertical 4:5, adult psychological depth.
+Do NOT make it a cartoon, NO Pixar, NO anime, NO enlarged doll eyes, NO raw grainy camera photo.
+Do NOT copy the reference person's face, hair, earrings or clothes: draw a completely different person as described below.
+No text, no logos, no watermark, exactly one person.
 
 <PERSON>
 ```
