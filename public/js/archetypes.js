@@ -337,8 +337,8 @@ export const ARCHETYPE_SLUGS = Object.freeze({
   'перфекционист': 'control-freak',
 });
 
-// Add an id here once /img/archetypes/<id>.webp exists; until then the card shows a monogram placeholder.
-const IMAGES_PENDING = new Set(['anxious-preoccupied', 'fearful-avoidant']);
+// List an id here until /img/archetypes/<id>.webp exists: such a card shows a monogram placeholder.
+const IMAGES_PENDING = new Set();
 export const IMAGES_READY = new Set(ARCHETYPE_IDS.filter((id) => !IMAGES_PENDING.has(id)));
 
 /** @param {string} id */
