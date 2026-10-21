@@ -263,6 +263,7 @@ function resultView() {
       h('button', { class: 'btn btn-primary', text: 'Ещё раз', on: { click: start } }),
       h('button', { class: 'btn btn-ghost', text: '⇄ Поменять местами', on: { click: () => { swap(); start(); } } }),
     ]),
+    h('p', { class: 'muted small duel-disclaimer', text: 'Это иллюстрация паттернов из исследований, а не прогноз ваших отношений.' }),
   ]);
 }
 
@@ -279,16 +280,18 @@ function tournamentView() {
   return h('div', {}, [
     h('p', { class: 'note', text: `Тёмные типы чаще «выигрывают» дуэль, но здоровый союз чаще всех строит ${ARCHETYPES[healthiest.id].name.toLowerCase()}: победа в манипуляции — не то же самое, что хорошие отношения.` }),
     h('div', { class: 'matrix-wrap' }, [h('table', { class: 'duel-leaderboard' }, [
-      h('thead', {}, [h('tr', {}, ['#', 'Тип', 'Побеждает', 'Здоровый союз', 'Сохраняет себя'].map((t) => h('th', { text: t })))]),
+      h('thead', {}, [h('tr', {}, ['#', 'Тип', 'Побеждает', 'Здоровый союз', 'Союз по расчёту', 'Сохраняет себя'].map((t) => h('th', { text: t })))]),
       h('tbody', {}, tour.board.map((s, i) => h('tr', {}, [
         h('td', { text: String(i + 1) }),
         h('td', {}, [h('div', { class: 'duel-lb-name' }, [media(s.id, 'media-xs'), h('span', { text: ARCHETYPES[s.id].name })])]),
         h('td', { text: pct(s.wins, s.games) }),
         h('td', { text: pct(s.healthy, s.games) }),
+        h('td', { text: pct(s.pragmatic, s.games) }),
         h('td', { text: `${s.avgEsteem} / 10` }),
       ]))),
     ])]),
-    h('p', { class: 'muted small', text: '«Побеждает» — к концу дуэли самооценка выше, чем у партнёра. «Сохраняет себя» — средняя итоговая самооценка. Правила одинаковы для всех; различаются только колоды и характер.' }),
+    h('p', { class: 'muted small', text: '«Побеждает» — к концу дуэли самооценка выше, чем у партнёра. «Союз по расчёту» — оба целы и держатся на выгоде. «Сохраняет себя» — средняя итоговая самооценка. Правила одинаковы для всех; различаются только колоды и характер. Похожие тёмные типы бьют друг друга мягче: они играют по одним правилам.' }),
+    h('p', { class: 'muted small duel-disclaimer', text: 'Это иллюстрация паттернов из исследований, а не прогноз ваших отношений.' }),
   ]);
 }
 

@@ -1,6 +1,6 @@
 // «Дуэль тактик» engine: pure functions, no DOM. The same seed always plays the same duel.
 
-import { CARDS, DECKS, STYLE, START, MAX_TURNS, HAND_SIZE } from './duel-data.js';
+import { CARDS, DECKS, STYLE, START, MAX_TURNS, HAND_SIZE, DARK, NARCISSISTS } from './duel-data.js';
 
 const clamp = (n) => Math.max(0, Math.min(10, n));
 
@@ -16,6 +16,17 @@ export function makeRng(seed = 1) {
 }
 
 const other = (side) => (side === 'a' ? 'b' : 'a');
+
+/**
+ * How hard a hostile move lands between these two (1 = full). Two dark types know the game and take it softer,
+ * two narcissists softest; a psychopath's moves stay harmful even to his own kind.
+ */
+export function similarity(actorId, targetId) {
+  if (!DARK.includes(actorId) || !DARK.includes(targetId)) return 1;
+  if (actorId === 'psychopath') return 0.75;
+  if (NARCISSISTS.includes(actorId) && NARCISSISTS.includes(targetId)) return 0.35;
+  return 0.5;
+}
 
 /** Scales a change by who receives it: trust gains by `bond`, esteem losses by `resilience`. */
 function personal(id, { esteem, trust }) {
@@ -55,6 +66,7 @@ export function scoreCard(cardId, actor, target) {
   const selfGain = (s.esteem ?? 0) + 0.5 * (s.trust ?? 0);
 
   let score = (deck.length - deck.indexOf(cardId)) * 0.8; // habit: favourite moves first
+  score += (style.keep ?? 0) * help * (target.trust <= 5 ? 1.5 : 0.4); // dark types invest when they might lose the partner
   score += style.exploit * harm * (target.trust >= 5 ? 1.5 : 1); // exploiters press harder on someone attached
   score += style.selfCare * selfGain * (actor.esteem <= 4 ? 2 : 0.5); // protect yourself when hurt
   score += style.repair * help * (target.trust <= 4 || target.esteem <= 4 ? 1.5 : 0.6); // repair when the bond weakens
@@ -96,6 +108,11 @@ export function applyCard(state, side, cardId) {
   let targetDelta = { esteem: c.target?.esteem ?? 0, trust: c.target?.trust ?? 0 };
   if (blocked) targetDelta = { esteem: 0, trust: 0 };
   if (doubled && targetDelta.esteem < 0) targetDelta = { ...targetDelta, esteem: targetDelta.esteem * 2 };
+  const soften = c.family === 'manipulation' || c.family === 'escalation' ? similarity(actor.id, target.id) : 1;
+  if (soften < 1) {
+    const cut = (v) => (v < 0 ? -Math.max(1, Math.round(-v * soften)) : v);
+    targetDelta = { esteem: cut(targetDelta.esteem), trust: cut(targetDelta.trust) };
+  }
   targetDelta = personal(target.id, targetDelta);
 
   const before = { self: { esteem: actor.esteem, trust: actor.trust }, target: { esteem: target.esteem, trust: target.trust } };
@@ -148,6 +165,7 @@ export function judge(state) {
   }
   if (Math.min(a.esteem, b.esteem) >= 6 && Math.min(a.trust, b.trust) >= 6) return { outcome: 'healthy', winner: 'both', who: null };
   if (Math.min(a.trust, b.trust) >= 6 && Math.min(a.esteem, b.esteem) <= 3) return { outcome: 'toxic', winner: byEsteem, who: null };
+  if (Math.min(a.esteem, b.esteem) >= 5 && Math.min(a.trust, b.trust) >= 3) return { outcome: 'pragmatic', winner: byEsteem, who: null };
   if (Math.max(a.trust, b.trust) <= 3) return { outcome: 'cold', winner: byEsteem, who: null };
   return { outcome: 'shaky', winner: byEsteem, who: null };
 }
@@ -191,7 +209,7 @@ export function runDuel(a, b, { seed = 1 } = {}) {
  *            pairs: Record<string, {wins: number, losses: number, draws: number, healthy: number, games: number}>}}
  */
 export function tournament(ids, { runs = 20, seed = 7 } = {}) {
-  const stats = Object.fromEntries(ids.map((id) => [id, { id, games: 0, wins: 0, healthy: 0, broke: 0, left: 0, esteemSum: 0 }]));
+  const stats = Object.fromEntries(ids.map((id) => [id, { id, games: 0, wins: 0, healthy: 0, pragmatic: 0, broke: 0, left: 0, esteemSum: 0 }]));
   const pairs = {};
   let n = 0;
   for (const a of ids) {
@@ -208,6 +226,7 @@ export function tournament(ids, { runs = 20, seed = 7 } = {}) {
           s.esteemSum += final[side].esteem;
           if (result.winner === side) s.wins += 1;
           if (result.outcome === 'healthy') s.healthy += 1;
+          if (result.outcome === 'pragmatic') s.pragmatic += 1;
           if (result.outcome === 'broken' && result.who !== side && result.who) s.broke += 1;
           if (result.outcome === 'left' && result.who === side) s.left += 1;
         }

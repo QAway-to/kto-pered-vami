@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ARCHETYPE_IDS } from '../public/js/archetypes.js';
 import { CARDS, CARD_IDS, DECKS, STYLE, FAMILIES, OUTCOMES, MAX_TURNS, START } from '../public/js/duel-data.js';
 import {
-  makeRng, initState, drawHand, chooseCard, applyCard, isOver, judge, decisiveEvent, runDuel, tournament,
+  makeRng, initState, drawHand, chooseCard, applyCard, isOver, judge, decisiveEvent, runDuel, tournament, similarity,
 } from '../public/js/duel-engine.js';
 
 test('every archetype has a 5-card deck of known cards and a style', () => {
@@ -82,8 +82,9 @@ test('judge covers every ending', () => {
   assert.deepEqual(judge(st([7, 7], [6, 6])), { outcome: 'healthy', winner: 'both', who: null });
   assert.equal(judge(st([2, 8], [7, 7])).outcome, 'toxic');
   assert.equal(judge(st([5, 2], [5, 3])).outcome, 'cold');
+  assert.equal(judge(st([5, 4], [7, 3])).outcome, 'pragmatic');
   assert.equal(judge(st([5, 5], [4, 4])).outcome, 'shaky');
-  for (const k of ['broken', 'left', 'healthy', 'toxic', 'cold', 'shaky']) assert.ok(OUTCOMES[k]);
+  for (const k of ['broken', 'left', 'healthy', 'toxic', 'pragmatic', 'cold', 'shaky']) assert.ok(OUTCOMES[k]);
 });
 
 test('runDuel is reproducible, alternates sides and stops in time', () => {
@@ -122,4 +123,25 @@ test('the hook is not spent on a card that cannot hurt esteem', () => {
   assert.equal(noEsteem.event.doubled, true);
   const zero = { ...s, b: { ...s.b, esteem: 0 } };
   assert.equal(applyCard(zero, 'a', 'devaluation').event.doubled, false, 'nothing left to double');
+});
+
+test('similar dark partners take manipulation softer; a psychopath stays the harshest', () => {
+  assert.equal(similarity('secure', 'psychopath'), 1);
+  assert.ok(similarity('grandiose-narcissist', 'vulnerable-narcissist') < similarity('machiavellian', 'dark-empath'));
+  assert.ok(similarity('psychopath', 'machiavellian') > similarity('machiavellian', 'psychopath'));
+  const onDark = applyCard(initState('machiavellian', 'dark-empath'), 'a', 'gaslighting').event.delta.target.esteem;
+  const onLight = applyCard(initState('machiavellian', 'avoidant'), 'a', 'gaslighting').event.delta.target.esteem;
+  assert.ok(onDark > onLight, 'the same move hurts a dark partner less');
+});
+
+test('every dark type has at least one healthy card', () => {
+  for (const id of ['dark-empath', 'grandiose-narcissist', 'vulnerable-narcissist', 'machiavellian', 'psychopath']) {
+    assert.ok(DECKS[id].some((c) => CARDS[c].family === 'healthy'), id);
+  }
+});
+
+test('tournament: the psychopath breaks partners most often', () => {
+  const { board } = tournament(ARCHETYPE_IDS, { runs: 6 });
+  const harshest = [...board].sort((x, y) => y.broke - x.broke)[0];
+  assert.equal(harshest.id, 'psychopath');
 });

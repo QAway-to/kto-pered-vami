@@ -136,6 +136,26 @@ export const CARDS = {
     self: { esteem: -1 }, target: { trust: -1 },
     science: 'Гиперответственность и недоверие к другим (Hewitt & Flett, 1991)',
   },
+  generosity: {
+    name: 'Щедрость и восхищение', family: 'healthy', line: '«Ты сегодня потрясающе выглядишь. Пойдём, я угощаю».',
+    self: { esteem: 1 }, target: { esteem: 1, trust: 1 },
+    science: 'Нарциссическое восхищение не вредит отношениям, в отличие от соперничества (Wurst et al., 2017)',
+  },
+  deal: {
+    name: 'Взаимная выгода', family: 'healthy', line: '«Давай договоримся так, чтобы выиграли оба».',
+    self: { esteem: 1, trust: 1 }, target: { trust: 2 },
+    science: 'Pragma — любовь по расчёту, типичная для тёмной триады (Jonason & Kavanagh, 2010)',
+  },
+  adventure: {
+    name: 'Приключение вдвоём', family: 'healthy', line: '«Бросай всё, поехали к морю прямо сейчас».',
+    self: { esteem: 1 }, target: { esteem: 1, trust: 1 },
+    science: 'Ludus — любовь-игра и поиск острых ощущений (Jonason & Kavanagh, 2010)',
+  },
+  open_up: {
+    name: 'Признаться в ранимости', family: 'healthy', line: '«Мне страшно, что я тебе не нужен».',
+    self: { esteem: -1 }, target: { trust: 2 },
+    science: 'Самораскрытие создаёт близость (Aron et al., 1997)',
+  },
   i_message: {
     name: 'Я-сообщение', family: 'healthy', line: '«Мне обидно, когда так происходит».',
     self: { esteem: 1 }, target: { trust: 1 }, unhook: true,
@@ -168,10 +188,10 @@ export const CARD_IDS = Object.freeze(Object.keys(CARDS));
 /** Each archetype's deck: its typical moves, strongest preference first. */
 export const DECKS = {
   'dark-empath': ['guilt_trip', 'love_bombing', 'gaslighting', 'triangulation', 'empathy'],
-  'grandiose-narcissist': ['love_bombing', 'devaluation', 'charm', 'triangulation', 'gaslighting'],
-  'vulnerable-narcissist': ['victim', 'silent_treatment', 'devaluation', 'guilt_trip', 'withdraw'],
-  machiavellian: ['charm', 'triangulation', 'gaslighting', 'guilt_trip', 'deflect'],
-  psychopath: ['charm', 'provocation', 'gaslighting', 'devaluation', 'ghosting'],
+  'grandiose-narcissist': ['love_bombing', 'devaluation', 'charm', 'triangulation', 'generosity'],
+  'vulnerable-narcissist': ['victim', 'silent_treatment', 'devaluation', 'guilt_trip', 'open_up'],
+  machiavellian: ['charm', 'triangulation', 'gaslighting', 'guilt_trip', 'deal'],
+  psychopath: ['charm', 'provocation', 'gaslighting', 'devaluation', 'adventure'],
   borderline: ['idealization', 'test', 'cling', 'outburst', 'repair'],
   avoidant: ['withdraw', 'deflect', 'ghosting', 'boundary', 'empathy'],
   hsp: ['attune', 'retreat', 'empathy', 'i_message', 'withdraw'],
@@ -183,14 +203,15 @@ export const DECKS = {
 /**
  * How each archetype weighs a situation when it picks a card, plus two traits of the person:
  * `bond` — how much trust they actually form (cold types barely attach: gains are scaled down);
- * `resilience` — how hard esteem hits land (secure attachment buffers, high sensitivity amplifies).
+ * `resilience` — how hard esteem hits land (secure attachment buffers, high sensitivity amplifies);
+ * `keep` — how much a dark type invests in keeping a partner it values (pragmatic or playful love, not none).
  */
 export const STYLE = {
-  'dark-empath': { exploit: 2, selfCare: 1, repair: 0, bond: 0.6, resilience: 1 },
-  'grandiose-narcissist': { exploit: 3, selfCare: 1, repair: 0, bond: 0.6, resilience: 1.2 },
-  'vulnerable-narcissist': { exploit: 1, selfCare: 2, repair: 0, bond: 0.8, resilience: 1.3 },
-  machiavellian: { exploit: 3, selfCare: 1, repair: 0, bond: 0.4, resilience: 0.8 },
-  psychopath: { exploit: 3, selfCare: 0, repair: 0, bond: 0.2, resilience: 0.6 },
+  'dark-empath': { exploit: 2, selfCare: 1, repair: 0, bond: 0.6, resilience: 1, keep: 1.5 },
+  'grandiose-narcissist': { exploit: 3, selfCare: 1, repair: 0, bond: 0.6, resilience: 1.2, keep: 1.5 },
+  'vulnerable-narcissist': { exploit: 1, selfCare: 2, repair: 0, bond: 0.8, resilience: 1.3, keep: 1.5 },
+  machiavellian: { exploit: 3, selfCare: 1, repair: 0, bond: 0.4, resilience: 0.8, keep: 2 },
+  psychopath: { exploit: 3, selfCare: 0, repair: 0, bond: 0.2, resilience: 0.6, keep: 0.7 },
   borderline: { exploit: 0, selfCare: 1, repair: 1, bond: 1.2, resilience: 1.3 },
   avoidant: { exploit: 0, selfCare: 2, repair: 1, bond: 0.6, resilience: 0.9 },
   hsp: { exploit: 0, selfCare: 2, repair: 2, bond: 1, resilience: 1.3 },
@@ -199,6 +220,14 @@ export const STYLE = {
   'control-freak': { exploit: 1, selfCare: 1, repair: 1, bond: 0.8, resilience: 1 },
 };
 
+/**
+ * Partners of a kind play by shared rules: their manipulations land softer on each other.
+ * Similar dark traits go with higher satisfaction, narcissism most of all; psychopathy stays the most harmful
+ * (Smith et al., 2014; Kardum et al.; Hudek-Knežević et al.).
+ */
+export const DARK = Object.freeze(['dark-empath', 'grandiose-narcissist', 'vulnerable-narcissist', 'machiavellian', 'psychopath']);
+export const NARCISSISTS = Object.freeze(['grandiose-narcissist', 'vulnerable-narcissist']);
+
 /** Endings, judged from the final meters. */
 export const OUTCOMES = {
   broken: { label: 'Сломлен', tone: 'bad', text: 'Самооценка одного обнулилась: его «съели».' },
@@ -206,5 +235,6 @@ export const OUTCOMES = {
   toxic: { label: 'Токсичная петля', tone: 'bad', text: 'Держатся друг за друга, но разрушают себя.' },
   cold: { label: 'Холодная война', tone: 'mid', text: 'Вместе, но доверия почти не осталось.' },
   healthy: { label: 'Здоровый союз', tone: 'good', text: 'Оба сохранили себя и доверие друг к другу.' },
+  pragmatic: { label: 'Союз по расчёту', tone: 'mid', text: 'Оба целы и держатся вместе на взаимной выгоде — без тепла, но устойчиво.' },
   shaky: { label: 'Шатко', tone: 'mid', text: 'Ни победы, ни разрыва: отношения на грани.' },
 };
