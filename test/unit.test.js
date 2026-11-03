@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { ARCHETYPES, ARCHETYPE_IDS, CHARACTER_IDS, IMAGES_READY, archetypeImage, attachmentQuadrant } from '../public/js/archetypes.js';
+import {
+  ARCHETYPES, ARCHETYPE_IDS, CHARACTER_IDS, IMAGES_READY, MOOD_KEYS, MOODS_READY, archetypeImage, moodImage, attachmentQuadrant,
+} from '../public/js/archetypes.js';
 import { QUESTIONS, DIM_KEYS, PROTOTYPES, scoreDimensions, rankArchetypes, attachmentStyle } from '../public/js/quiz.js';
 import { CASES } from '../public/js/cases.js';
 import { validateMessages, isPersonaId, MAX_MESSAGES, MAX_MESSAGE_CHARS } from '../src/validate.js';
@@ -143,4 +145,16 @@ test('the attachment style is the quadrant of the anxiety and avoidance scales',
   assert.equal(attachmentStyle(scoreDimensions(answers(5, 1))).id, 'anxious-preoccupied');
   assert.equal(attachmentStyle(scoreDimensions(answers(5, 5))).id, 'fearful-avoidant');
   assert.ok(CHARACTER_IDS.includes(rankArchetypes(scoreDimensions(answers(5, 5)))[0].id), 'ranking holds character patterns only');
+});
+
+test('characters marked ready have all five mood variants on disk', () => {
+  assert.equal(moodImage('psychopath', 'no-such-mood'), archetypeImage('psychopath'));
+  for (const id of ARCHETYPE_IDS.filter((x) => !MOODS_READY.has(x))) assert.equal(moodImage(id, 'happy'), archetypeImage(id), 'not ready: main portrait');
+  for (const id of MOODS_READY) {
+    for (const mood of MOOD_KEYS) {
+      const src = moodImage(id, mood);
+      assert.equal(src, `/img/archetypes/moods/${id}-${mood}.webp`);
+      assert.ok(existsSync(new URL(`../public${src}`, import.meta.url)), `missing ${src}`);
+    }
+  }
 });

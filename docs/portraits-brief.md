@@ -83,3 +83,28 @@ wistful look, a faint smile that does not reach the eyes. Muted plum jacket over
 on a strap. One arm crossed protectively over his chest. Background: blurred gradient split diagonally, warm rose-gold
 light on one side and cool slate-blue shadow on the other. Mood: longing and hesitation at once.
 ```
+
+## Эмоции для игры (тамагочи)
+
+У каждого портрета 5 вариантов настроения: тот же человек, та же картинка, меняется только выражение лица.
+
+- **Настроения:** `happy` (светится), `hurt` (задет), `anxious` (тревожится), `smitten` (влюблён), `guarded` (закрылся). Список — `MOODS` в `public/js/archetypes.js`.
+- **Файлы:** `public/img/archetypes/moods/<id>-<mood>.webp`, 640 × 800, WebP около 82. Тест «every portrait has all its mood variants on disk» проверяет комплект.
+- **Референс здесь — сам портрет персонажа** (`public/img/archetypes/<id>.webp`), а не `dark-empath.webp`: нужно сохранить именно этого человека.
+- **Бесплатный пайплайн:** `node reels/tools/antigravity.mjs batch <jobs.json> 2` (папка `Downloads/types/ClodeDeskGener/reels`). Antigravity должен быть открыт; генерация идёт по подписке AI Pro, без ключа и без оплаты. `reels/tools/gemini.mjs` — платный API, только после явного «да» на сумму.
+
+Промпт (подставь настроение из списка ниже):
+
+```
+Edit the attached portrait. It shows the exact character to keep: the same person (face, age, hair, skin),
+the same clothes, the same art style and rendering, the same lighting, colors and background, the same chest-up vertical 4:5 framing.
+Change ONLY the facial expression and a slight head and shoulder pose to show this mood: <MOOD>.
+Keep it subtle and believable, an adult face, not a cartoon, no exaggerated grimace, no new props.
+No text, no logos, no watermark, exactly one person.
+```
+
+- `happy`: glowing and genuinely happy: a warm open smile that reaches the eyes, relaxed shoulders, light catching the face
+- `hurt`: hurt and deflated: eyes lowered, lips pressed together, shoulders slightly sunk, quiet sadness, glossy eyes without streaming tears
+- `anxious`: anxious and on edge: worried eyes glancing to the side, tense raised brows, slightly biting the lower lip
+- `smitten`: smitten and dazzled: a soft dreamy gaze, a slight blush, a shy captivated smile, as if a sweet message just arrived
+- `guarded`: closed off and guarded: a cool distant gaze past the viewer, a neutral tight mouth, chin slightly lifted, emotionally withdrawn

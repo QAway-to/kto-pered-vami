@@ -374,3 +374,22 @@ export const IMAGES_READY = new Set(ARCHETYPE_IDS.filter((id) => !IMAGES_PENDING
 
 /** @param {string} id */
 export const archetypeImage = (id) => (IMAGES_READY.has(id) ? `/img/archetypes/${id}.webp` : null);
+
+/**
+ * Mood variants of every portrait for the pet game: same person, same picture, only the expression changes.
+ * Files: /img/archetypes/moods/<id>-<mood>.webp (made with the free Antigravity pipeline, see docs/portraits-brief.md).
+ */
+export const MOODS = Object.freeze({
+  happy: 'Светится',
+  hurt: 'Задет',
+  anxious: 'Тревожится',
+  smitten: 'Влюблён',
+  guarded: 'Закрылся',
+});
+export const MOOD_KEYS = Object.freeze(Object.keys(MOODS));
+
+// Add an id once all five of its mood files exist; until then that character shows its main portrait in every mood.
+export const MOODS_READY = new Set(['machiavellian', 'psychopath']);
+
+/** Portrait for a mood; falls back to the main portrait for an unknown mood or a character whose moods are not ready. */
+export const moodImage = (id, mood) => (MOODS[mood] && MOODS_READY.has(id) ? `/img/archetypes/moods/${id}-${mood}.webp` : archetypeImage(id));
